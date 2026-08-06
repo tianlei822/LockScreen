@@ -49,6 +49,8 @@ private struct DoorRingButton: View {
 
   @State private var swing = 0.0
   @State private var pulse = false
+  @State private var struck = false
+  @State private var knockID = 0
 
   private let brass = Color(red: 0.78, green: 0.55, blue: 0.22)
 
@@ -65,6 +67,7 @@ private struct DoorRingButton: View {
             )
           )
           .overlay(Circle().stroke(Color.black.opacity(0.72), lineWidth: 2))
+          .overlay(Circle().fill(Color.white.opacity(struck ? 0.22 : 0)))
           .frame(width: 48, height: 48)
 
         Circle()
@@ -104,16 +107,34 @@ private struct DoorRingButton: View {
   }
 
   private func knock() {
-    swing = swing == 0 ? (sideName == "left" ? 30 : -30) : -swing
-    pulse = true
+    knockID += 1
+    let currentKnock = knockID
     onKnock()
 
+    // Strike: the ring's lower edge swings in toward the door around its top hinge.
+    withAnimation(.easeIn(duration: 0.09)) {
+      swing = -26
+    }
+
     Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(190))
-      withAnimation(.spring(response: 0.32, dampingFraction: 0.48)) {
+      try? await Task.sleep(for: .milliseconds(100))
+      guard currentKnock == knockID else { return }
+
+      // Impact: halo, boss flash, then a damped pendulum settle.
+      struck = true
+      pulse = true
+      withAnimation(.spring(response: 0.55, dampingFraction: 0.36)) {
         swing = 0
       }
-      try? await Task.sleep(for: .milliseconds(240))
+
+      try? await Task.sleep(for: .milliseconds(180))
+      guard currentKnock == knockID else { return }
+      withAnimation(.easeOut(duration: 0.3)) {
+        struck = false
+      }
+
+      try? await Task.sleep(for: .milliseconds(370))
+      guard currentKnock == knockID else { return }
       pulse = false
     }
   }
