@@ -44,7 +44,19 @@ struct LockScreenApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+  private var screenObserver: NSObjectProtocol?
+
   func applicationDidFinishLaunching(_ notification: Notification) {
+    screenObserver = NotificationCenter.default.addObserver(
+      forName: NSApplication.didChangeScreenParametersNotification,
+      object: nil,
+      queue: .main
+    ) { _ in
+      Task { @MainActor in
+        WindowPresentation.refreshScreenCovers()
+      }
+    }
+
     Task { @MainActor in
       try? await Task.sleep(for: .milliseconds(300))
       guard let window = NSApp.windows.first else { return }
@@ -60,6 +72,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
+  func applicationDidBecomeActive(_ notification: Notification) {
+    WindowPresentation.reassertKiosk()
+  }
+
+  func applicationDidResignActive(_ notification: Notification) {
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(250))
+      WindowPresentation.reassertKiosk()
+    }
+  }
+
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     true
   }
@@ -67,6 +90,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 @MainActor
 enum WindowPresentation {
+  /// Kiosk-style options so the ritual truly owns the screen while immersive:
+  /// menu bar and Dock stay hidden, app switching / force quit are disabled.
+  /// ⇧⌘F and ⌘Q remain as owner escape hatches.
+  private static let kioskOptions: NSApplication.PresentationOptions = [
+    .hideDock,
+    .hideMenuBar,
+    .disableAppleMenu,
+    .disableProcessSwitching,
+    .disableForceQuit,
+    .disableSessionTermination,
+    .disableHideApplication,
+  ]
+
+  private static var screenCovers: [NSWindow] = []
+
   static func toggle(_ window: NSWindow?) {
     guard let window else { return }
     isImmersive(window) ? enterWindowed(window) : enterImmersive(window)
@@ -76,17 +114,66 @@ enum WindowPresentation {
     guard let screen = window.screen ?? NSScreen.main else { return }
 
     window.level = .screenSaver
-    window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    window.collectionBehavior = [
+      .canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle,
+    ]
     window.isMovable = false
     window.hasShadow = false
     setWindowButtonsHidden(true, in: window)
-    window.setFrame(screen.frame, display: true)
+
+    // Kiosk options only apply while the app is frontmost, and unbundled
+    // `swift run` binaries may need an explicit activation policy first.
+    NSApp.setActivationPolicy(.regular)
     window.makeKeyAndOrderFront(nil)
-    NSApp.activate(ignoringOtherApps: true)
+    NSApp.activate()
+    NSApp.presentationOptions = kioskOptions
+
+    // Frame after the kiosk options: while the menu bar and Dock are still
+    // visible, AppKit clamps window frames to the visible frame. Overscan
+    // pushes the window's rounded corners off the visible area.
+    window.setFrame(screen.frame.insetBy(dx: -12, dy: -12), display: true)
+
+    coverSecondaryScreens(except: screen)
+  }
+
+  /// Kiosk options only apply while the app is frontmost; re-assert them
+  /// when focus returns or something briefly steals it mid-ritual. The frame
+  /// is re-applied too because the first attempt can be clamped while the
+  /// menu bar and Dock are still animating out.
+  static func reassertKiosk() {
+    guard !NSApp.isHidden,
+      let window = NSApp.windows.first(where: { !screenCovers.contains($0) }),
+      isImmersive(window),
+      let screen = window.screen
+    else { return }
+
+    NSApp.presentationOptions = kioskOptions
+    if !NSApp.isActive {
+      NSApp.activate()
+    }
+
+    let target = screen.frame.insetBy(dx: -12, dy: -12)
+    if window.frame != target {
+      window.setFrame(target, display: true)
+    }
+  }
+
+  /// Re-blank secondary displays after a display is (dis)connected mid-session.
+  static func refreshScreenCovers() {
+    guard let window = NSApp.windows.first(where: { !screenCovers.contains($0) }),
+      isImmersive(window),
+      let screen = window.screen
+    else { return }
+
+    reassertKiosk()
+    coverSecondaryScreens(except: screen)
   }
 
   private static func enterWindowed(_ window: NSWindow) {
     guard let screen = window.screen ?? NSScreen.main else { return }
+
+    dismissScreenCovers()
+    NSApp.presentationOptions = []
 
     window.level = .normal
     window.collectionBehavior = [.fullScreenPrimary]
@@ -106,6 +193,34 @@ enum WindowPresentation {
       y: visibleFrame.midY - size.height / 2
     )
     window.setFrame(NSRect(origin: origin, size: size), display: true, animate: true)
+  }
+
+  private static func coverSecondaryScreens(except covered: NSScreen) {
+    dismissScreenCovers()
+
+    for screen in NSScreen.screens where screen != covered {
+      let cover = NSWindow(
+        contentRect: screen.frame,
+        styleMask: [.borderless],
+        backing: .buffered,
+        defer: false
+      )
+      cover.level = .screenSaver
+      cover.backgroundColor = .black
+      cover.isOpaque = true
+      cover.hasShadow = false
+      cover.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+      cover.contentView = NSHostingView(rootView: Color.black)
+      cover.orderFront(nil)
+      screenCovers.append(cover)
+    }
+  }
+
+  private static func dismissScreenCovers() {
+    for cover in screenCovers {
+      cover.close()
+    }
+    screenCovers.removeAll()
   }
 
   private static func isImmersive(_ window: NSWindow) -> Bool {

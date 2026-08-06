@@ -45,6 +45,7 @@ open .build/Threshold.app
 - On `Cipher Vault`, enter the configured code with the keyboard or keypad, then press `Return` or the unlock key. The default is `1024`; this is only an app ritual code, never your macOS password. / 在 `Cipher Vault` 中使用键盘或数字键盘输入配置密码，再按 `Return` 或开锁键。默认值为 `1024`；它只是应用仪式密码，绝不能使用 macOS 系统密码。
 - After a successful ritual, the doors finish opening, the app hides immediately, and the previous workspace becomes active without an intermediate window. / 仪式成功后，门完成开启，应用立即隐藏并激活之前的工作页面，不再出现中间窗口。
 - Press `⇧⌘F` or use the upper-right button to toggle immersive/windowed mode. / 按 `⇧⌘F` 或点击右上角按钮切换沉浸/窗口模式。
+- Immersive mode is a kiosk-style takeover: the menu bar and Dock are hidden, secondary displays are blanked, and app switching/force quit are disabled while the ritual is frontmost. Exit with `⇧⌘F` or `⌘Q`. Note that an unbundled `swift run` binary is not allowed to become the frontmost app on recent macOS, so full coverage requires the bundled app from `sh Scripts/build-app.sh`. / 沉浸模式是 kiosk 式接管：隐藏菜单栏与程序坞、副屏黑屏遮盖，且仪式在前台时禁用应用切换与强制退出；可用 `⇧⌘F` 或 `⌘Q` 退出。注意 macOS 不允许未打包的 `swift run` 二进制成为最前应用，完整覆盖效果需使用 `sh Scripts/build-app.sh` 打包后的应用。
 
 ## Verification / 验证
 
@@ -58,6 +59,6 @@ sh Scripts/build-app.sh
 
 ## System lock integration / 系统锁屏衔接
 
-Apple's public APIs do not provide a supported way for a third-party app to replace the password or Touch ID lock interface. A later release can provide the passive animation as a `.saver` module and ask macOS to perform the real lock; the interactive ritual remains an app experience before or after that secure boundary.
+Apple's public APIs do not provide a supported way for a third-party app to replace the password or Touch ID lock interface. The immersive mode therefore hardens the app itself (kiosk presentation options, edge-to-edge coverage, blanked secondary displays) instead of intercepting system authentication. A later release can provide the passive animation as a `.saver` module and ask macOS to perform the real lock; the interactive ritual remains an app experience before or after that secure boundary.
 
-Apple 公开 API 不支持第三方应用替换密码或 Touch ID 锁屏界面。后续版本可以把被动动画封装为 `.saver` 模块，并交由 macOS 执行真实锁定；互动仪式仍作为系统安全边界之前或之后的应用体验。
+Apple 公开 API 不支持第三方应用替换密码或 Touch ID 锁屏界面。因此沉浸模式改为加固应用自身（kiosk 展示选项、无死角落满屏、副屏遮盖），而不拦截系统认证。后续版本可以把被动动画封装为 `.saver` 模块，并交由 macOS 执行真实锁定；互动仪式仍作为系统安全边界之前或之后的应用体验。
