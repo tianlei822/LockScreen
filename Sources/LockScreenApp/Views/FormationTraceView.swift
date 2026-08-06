@@ -118,70 +118,221 @@ private struct FormationTraceCanvas: View {
   let energy: Double
   let onTrace: (Double) -> Void
 
+  private enum TraceOutcome {
+    case complete
+    case partial
+    case rejected
+  }
+
+  private let jade = Color(red: 0.66, green: 1, blue: 0.74)
+  private let amber = Color(red: 1.0, green: 0.62, blue: 0.32)
+
   @State private var points: [NormalizedPoint] = []
   @State private var feedback = "TRACE THE GLYPH"
   @State private var traceID = 0
+  @State private var isDragging = false
+  @State private var outcome: TraceOutcome?
+  @State private var outcomeTime: TimeInterval?
 
   var body: some View {
-    GeometryReader { proxy in
-      let size = proxy.size
-      let template = FormationTrajectoryMatcher.template(for: trajectory)
+    TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
+      GeometryReader { proxy in
+        let size = proxy.size
+        let time = timeline.date.timeIntervalSinceReferenceDate
+        let template = FormationTrajectoryMatcher.template(for: trajectory)
+        let breath = 0.5 + 0.5 * sin(time * 1.8)
+        let outcomeAge = outcomeTime.map { time - $0 }
 
-      ZStack {
-        trajectoryPath(template, in: size)
-          .stroke(Color.cyan.opacity(0.12), lineWidth: 18)
-          .blur(radius: 9)
+        ZStack {
+          trajectoryPath(template, in: size)
+            .stroke(Color.cyan.opacity(0.10 + breath * 0.05), lineWidth: 18)
+            .blur(radius: 9)
 
-        trajectoryPath(template, in: size)
-          .stroke(
-            Color.cyan.opacity(0.48),
-            style: StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: [4, 9])
-          )
-
-        trajectoryPath(template, in: size)
-          .trim(from: 0, to: min(0.98, CGFloat(energy)))
-          .stroke(
-            LinearGradient(
-              colors: [.cyan, Color(red: 0.66, green: 1, blue: 0.74)],
-              startPoint: .topLeading,
-              endPoint: .bottomTrailing
-            ),
-            style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
-          )
-          .shadow(color: .cyan.opacity(0.8), radius: 8)
-
-        if !points.isEmpty {
-          trajectoryPath(points, in: size)
+          trajectoryPath(template, in: size)
             .stroke(
-              LinearGradient(colors: [.white, .cyan], startPoint: .leading, endPoint: .trailing),
-              style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+              Color.cyan.opacity(0.36 + breath * 0.16),
+              style: StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: [4, 9])
             )
-            .shadow(color: .cyan, radius: 8)
-        }
 
-        VStack {
-          Spacer()
-          Text(feedback)
-            .font(.system(size: 9, weight: .medium, design: .monospaced))
-            .tracking(2.6)
-            .foregroundStyle(Color.cyan.opacity(0.72))
-            .padding(.bottom, 6)
+          trajectoryPath(template, in: size)
+            .trim(from: 0, to: min(0.98, CGFloat(energy)))
+            .stroke(
+              LinearGradient(
+                colors: [.cyan, jade],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              ),
+              style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+            )
+            .shadow(color: .cyan.opacity(0.8), radius: 8)
+
+          guideSpark(template: template, size: size, time: time)
+
+          if !points.isEmpty {
+            trajectoryPath(points, in: size)
+              .stroke(
+                LinearGradient(colors: [.white, .cyan], startPoint: .leading, endPoint: .trailing),
+                style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+              )
+              .shadow(color: .cyan, radius: 8)
+          }
+
+          if isDragging, let head = points.last {
+            dragHead(point: head, size: size, time: time)
+          }
+
+          if let outcome, let outcomeAge, outcomeAge < 1 {
+            outcomeFX(outcome: outcome, age: outcomeAge, size: size, template: template)
+          }
+
+          VStack {
+            Spacer()
+            Text(feedback)
+              .font(.system(size: 9, weight: .medium, design: .monospaced))
+              .tracking(2.6)
+              .foregroundStyle(feedbackTint(outcomeAge: outcomeAge))
+              .padding(.bottom, 6)
+          }
         }
-      }
-      .contentShape(Rectangle())
-      .gesture(traceGesture(in: size))
-      .accessibilityLabel("Trace the (trajectory.title) formation path")
-      .accessibilityHint("Drag along the glowing guide, or press Return to channel it")
-      .onChange(of: trajectory) {
-        points.removeAll()
-        feedback = "TRACE THE GLYPH"
+        .contentShape(Rectangle())
+        .gesture(traceGesture(in: size))
+        .accessibilityLabel("Trace the (trajectory.title) formation path")
+        .accessibilityHint("Drag along the glowing guide, or press Return to channel it")
+        .onChange(of: trajectory) {
+          points.removeAll()
+          feedback = "TRACE THE GLYPH"
+          outcome = nil
+          outcomeTime = nil
+        }
       }
     }
+  }
+
+  /// A spark traveling along the template to show the tracing direction.
+  private func guideSpark(template: [NormalizedPoint], size: CGSize, time: TimeInterval)
+    -> some View
+  {
+    let fraction = (time * 0.13).truncatingRemainder(dividingBy: 1)
+    let position = point(at: fraction, in: template, size: size)
+    let trailPosition = point(
+      at: (fraction + 0.985).truncatingRemainder(dividingBy: 1), in: template, size: size)
+
+    return ZStack {
+      Circle()
+        .fill(Color.cyan.opacity(0.45))
+        .frame(width: 11, height: 11)
+        .blur(radius: 4)
+        .position(trailPosition)
+
+      Circle()
+        .fill(Color.white)
+        .frame(width: 5.5, height: 5.5)
+        .shadow(color: .cyan, radius: 8)
+        .position(position)
+    }
+    .blendMode(.plusLighter)
+    .opacity(energy >= 1 ? 0 : 0.9)
+    .allowsHitTesting(false)
+  }
+
+  /// Glowing comet head following the drag point.
+  private func dragHead(point: NormalizedPoint, size: CGSize, time: TimeInterval) -> some View {
+    let position = CGPoint(x: point.x * size.width, y: point.y * size.height)
+
+    return ZStack {
+      Circle()
+        .stroke(Color.cyan.opacity(0.5), lineWidth: 1)
+        .frame(width: 20 + sin(time * 6) * 4, height: 20 + sin(time * 6) * 4)
+        .position(position)
+
+      Circle()
+        .fill(Color.white)
+        .frame(width: 8, height: 8)
+        .blur(radius: 1.5)
+        .shadow(color: .cyan, radius: 10)
+        .position(position)
+    }
+    .blendMode(.plusLighter)
+    .allowsHitTesting(false)
+  }
+
+  /// Success ripples or a rejection flicker after the gesture ends.
+  private func outcomeFX(
+    outcome: TraceOutcome, age: TimeInterval, size: CGSize, template: [NormalizedPoint]
+  ) -> some View {
+    let maxDimension = max(size.width, size.height)
+
+    return ZStack {
+      switch outcome {
+      case .complete:
+        ForEach(0..<2, id: \.self) { wave in
+          let progress = max(0, min(1, (age - Double(wave) * 0.13) / 0.8))
+          if progress > 0, progress < 1 {
+            Circle()
+              .stroke(
+                (wave == 0 ? Color.white : jade).opacity(pow(1 - progress, 1.3) * 0.8),
+                lineWidth: (1 - progress) * 5 + 1
+              )
+              .frame(
+                width: maxDimension * (0.1 + progress * 1.05),
+                height: maxDimension * (0.1 + progress * 1.05)
+              )
+              .position(x: size.width / 2, y: size.height / 2)
+          }
+        }
+
+        if age < 0.5 {
+          trajectoryPath(template, in: size)
+            .stroke(Color.white.opacity((1 - age * 2) * 0.75), lineWidth: 3.5)
+            .shadow(color: jade, radius: 14)
+        }
+      case .partial:
+        EmptyView()
+      case .rejected:
+        if age < 0.5 {
+          trajectoryPath(template, in: size)
+            .stroke(amber.opacity((1 - age * 2) * 0.55), lineWidth: 2.5)
+        }
+      }
+    }
+    .blendMode(.plusLighter)
+    .allowsHitTesting(false)
+  }
+
+  private func feedbackTint(outcomeAge: TimeInterval?) -> Color {
+    guard let outcome, let outcomeAge, outcomeAge < 1.2 else {
+      return Color.cyan.opacity(0.72)
+    }
+
+    switch outcome {
+    case .complete:
+      return jade.opacity(0.95)
+    case .partial:
+      return Color.cyan.opacity(0.72)
+    case .rejected:
+      return amber.opacity(0.9)
+    }
+  }
+
+  private func point(at fraction: Double, in template: [NormalizedPoint], size: CGSize) -> CGPoint {
+    guard !template.isEmpty else { return .zero }
+    let scaled = fraction * Double(template.count)
+    let lower = Int(scaled) % template.count
+    let upper = (lower + 1) % template.count
+    let mix = scaled - floor(scaled)
+    let a = template[lower]
+    let b = template[upper]
+
+    return CGPoint(
+      x: (a.x + (b.x - a.x) * mix) * size.width,
+      y: (a.y + (b.y - a.y) * mix) * size.height
+    )
   }
 
   private func traceGesture(in size: CGSize) -> some Gesture {
     DragGesture(minimumDistance: 0)
       .onChanged { value in
+        isDragging = true
         let point = normalized(value.location, in: size)
         guard let previous = points.last else {
           points = [point]
@@ -193,11 +344,14 @@ private struct FormationTraceCanvas: View {
         points.append(point)
       }
       .onEnded { value in
+        isDragging = false
         points.append(normalized(value.location, in: size))
         let score = FormationTrajectoryMatcher.score(points, for: trajectory)
         feedback =
           score >= 0.72
           ? "RESONANCE COMPLETE" : score >= 0.35 ? "RESONANCE PARTIAL" : "GLYPH REJECTED"
+        outcome = score >= 0.72 ? .complete : score >= 0.35 ? .partial : .rejected
+        outcomeTime = Date().timeIntervalSinceReferenceDate
         onTrace(score)
 
         traceID += 1

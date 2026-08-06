@@ -39,6 +39,26 @@ struct DoorStageView: View {
             )
             .offset(x: isOpen ? size.width * 0.06 : 0)
         }
+
+        // Light spilling through the seam as the doors part.
+        Capsule()
+          .fill(
+            LinearGradient(
+              colors: [
+                theme.palette.accentSoft.opacity(0),
+                theme.palette.accent.opacity(0.9),
+                theme.palette.accentSoft.opacity(0),
+              ],
+              startPoint: .top,
+              endPoint: .bottom
+            )
+          )
+          .frame(width: 70, height: size.height)
+          .blur(radius: 26)
+          .scaleEffect(x: isOpen ? 2.4 : 0.15)
+          .opacity(isOpen ? 0.8 : 0)
+          .blendMode(.plusLighter)
+          .allowsHitTesting(false)
       }
       .background(Color.black)
       .clipped()
@@ -85,32 +105,53 @@ private struct PortalRevealView: View {
   var body: some View {
     let palette = theme.palette
 
-    GeometryReader { proxy in
-      let unit = min(proxy.size.width, proxy.size.height)
+    TimelineView(.animation(minimumInterval: 1 / 24)) { timeline in
+      let time = timeline.date.timeIntervalSinceReferenceDate
 
-      ZStack {
-        RadialGradient(
-          colors: [palette.accentSoft, palette.haze, palette.backdrop],
-          center: .center,
-          startRadius: 20,
-          endRadius: max(proxy.size.width, proxy.size.height) * 0.68
-        )
+      GeometryReader { proxy in
+        let unit = min(proxy.size.width, proxy.size.height)
 
-        Circle()
-          .fill(palette.accent.opacity(0.24))
-          .blur(radius: unit * 0.08)
-          .frame(width: unit * 0.52, height: unit * 0.52)
+        ZStack {
+          RadialGradient(
+            colors: [palette.accentSoft, palette.haze, palette.backdrop],
+            center: .center,
+            startRadius: 20,
+            endRadius: max(proxy.size.width, proxy.size.height) * 0.68
+          )
 
-        VStack(spacing: 18) {
-          Text(portalSymbol)
-            .font(.system(size: unit * 0.16, weight: .ultraLight))
-          Text("THRESHOLD OPEN")
-            .font(.system(size: 12, weight: .semibold, design: .monospaced))
-            .tracking(6)
+          Circle()
+            .fill(palette.accent.opacity(0.24))
+            .blur(radius: unit * 0.08)
+            .frame(width: unit * 0.52, height: unit * 0.52)
+
+          Circle()
+            .stroke(
+              palette.accent.opacity(0.5),
+              style: StrokeStyle(lineWidth: 1, dash: [3, 7])
+            )
+            .frame(width: unit * 0.34, height: unit * 0.34)
+            .rotationEffect(.degrees(time * 10))
+
+          Circle()
+            .stroke(
+              palette.detail.opacity(0.35),
+              style: StrokeStyle(lineWidth: 1, dash: [10, 6])
+            )
+            .frame(width: unit * 0.44, height: unit * 0.44)
+            .rotationEffect(.degrees(-time * 7))
+
+          VStack(spacing: 18) {
+            Text(portalSymbol)
+              .font(.system(size: unit * 0.16, weight: .ultraLight))
+              .shadow(color: palette.accent.opacity(0.8), radius: isOpen ? 18 : 4)
+            Text("THRESHOLD OPEN")
+              .font(.system(size: 12, weight: .semibold, design: .monospaced))
+              .tracking(6)
+          }
+          .foregroundStyle(palette.primaryText)
+          .opacity(isOpen ? 1 : 0.35)
+          .scaleEffect(isOpen ? 1 : 0.82)
         }
-        .foregroundStyle(palette.primaryText)
-        .opacity(isOpen ? 1 : 0.35)
-        .scaleEffect(isOpen ? 1 : 0.82)
       }
     }
   }
