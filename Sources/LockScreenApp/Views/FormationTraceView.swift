@@ -4,10 +4,13 @@ import SwiftUI
 struct FormationTraceView: View {
   let trajectory: FormationTrajectory
   let energy: Double
+  let showsControls: Bool
   let onSelectTrajectory: (FormationTrajectory) -> Void
   let onTrace: (Double) -> Void
 
   var body: some View {
+    let style = trajectory.visualStyle
+
     GeometryReader { proxy in
       let canvasWidth = min(620, proxy.size.width * 0.62)
       let canvasHeight = min(440, proxy.size.height * 0.62)
@@ -19,59 +22,65 @@ struct FormationTraceView: View {
           onTrace: onTrace
         )
         .frame(width: canvasWidth, height: canvasHeight)
-        .position(x: proxy.size.width / 2, y: proxy.size.height * 0.43)
+        .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
 
         VStack(spacing: 14) {
           Spacer()
 
-          energyMeter
+          VStack(spacing: 14) {
+            energyMeter
 
-          HStack(spacing: 6) {
-            ForEach(FormationTrajectory.allCases) { option in
+            HStack(spacing: 6) {
+              ForEach(FormationTrajectory.allCases) { option in
+                Button {
+                  onSelectTrajectory(option)
+                } label: {
+                  HStack(spacing: 7) {
+                    Text(option.symbol)
+                      .font(.system(size: 18, weight: .light))
+                    Text(option.title.uppercased())
+                      .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                      .tracking(1.4)
+                  }
+                  .padding(.horizontal, 13)
+                  .padding(.vertical, 9)
+                  .background(option == trajectory ? style.primary.opacity(0.14) : .clear)
+                  .overlay(alignment: .bottom) {
+                    Rectangle()
+                      .fill(option == trajectory ? style.primary.opacity(0.9) : .clear)
+                      .frame(height: 1)
+                  }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(option == trajectory ? Color.white : Color.white.opacity(0.58))
+                .accessibilityLabel("Use \(option.title) formation")
+              }
+
+              Divider()
+                .frame(height: 24)
+                .overlay(style.primary.opacity(0.24))
+                .padding(.horizontal, 4)
+
               Button {
-                onSelectTrajectory(option)
+                onTrace(1)
               } label: {
-                HStack(spacing: 7) {
-                  Text(option.symbol)
-                    .font(.system(size: 18, weight: .light))
-                  Text(option.title.uppercased())
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .tracking(1.4)
-                }
-                .padding(.horizontal, 13)
-                .padding(.vertical, 9)
-                .background(option == trajectory ? Color.cyan.opacity(0.14) : .clear)
-                .overlay(alignment: .bottom) {
-                  Rectangle()
-                    .fill(option == trajectory ? Color.cyan.opacity(0.9) : .clear)
-                    .frame(height: 1)
-                }
+                Label("Channel", systemImage: "return")
+                  .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                  .tracking(1.2)
+                  .padding(.horizontal, 12)
+                  .padding(.vertical, 9)
               }
               .buttonStyle(.plain)
-              .foregroundStyle(option == trajectory ? Color.white : Color.white.opacity(0.58))
-              .accessibilityLabel("Use (option.title) formation trajectory")
+              .foregroundStyle(style.primary.opacity(0.72))
+              .keyboardShortcut(.return, modifiers: [])
+              .accessibilityLabel("Channel the selected formation without dragging")
+              .help("Keyboard alternative: press Return")
             }
-
-            Divider()
-              .frame(height: 24)
-              .overlay(Color.cyan.opacity(0.24))
-              .padding(.horizontal, 4)
-
-            Button {
-              onTrace(1)
-            } label: {
-              Label("Channel", systemImage: "return")
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .tracking(1.2)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.cyan.opacity(0.72))
-            .keyboardShortcut(.return, modifiers: [])
-            .accessibilityLabel("Channel the selected formation without dragging")
-            .help("Keyboard alternative: press Return")
           }
+          .opacity(showsControls ? 1 : 0)
+          .offset(y: showsControls ? 0 : 10)
+          .allowsHitTesting(showsControls)
+          .animation(.easeInOut(duration: 0.58), value: showsControls)
         }
         .padding(.bottom, 4)
       }
@@ -79,37 +88,39 @@ struct FormationTraceView: View {
   }
 
   private var energyMeter: some View {
-    VStack(spacing: 7) {
+    let style = trajectory.visualStyle
+
+    return VStack(spacing: 7) {
       HStack {
-        Text("AETHER CHARGE")
+        Text(trajectory.invocation)
         Spacer()
         Text(energy >= 1 ? "ACTIVATED" : "\(Int(energy * 100))%")
       }
       .font(.system(size: 9, weight: .semibold, design: .monospaced))
       .tracking(1.8)
-      .foregroundStyle(Color.cyan.opacity(0.78))
+      .foregroundStyle(style.primary.opacity(0.78))
 
       GeometryReader { proxy in
         ZStack(alignment: .leading) {
           Capsule()
-            .fill(Color.cyan.opacity(0.08))
+            .fill(style.primary.opacity(0.08))
           Capsule()
             .fill(
               LinearGradient(
-                colors: [Color.cyan.opacity(0.52), Color(red: 0.58, green: 1, blue: 0.74)],
+                colors: [style.primary.opacity(0.52), style.secondary],
                 startPoint: .leading,
                 endPoint: .trailing
               )
             )
             .frame(width: proxy.size.width * energy)
-            .shadow(color: Color.cyan.opacity(energy), radius: 8)
+            .shadow(color: style.primary.opacity(energy), radius: 8)
         }
       }
       .frame(height: 4)
     }
     .frame(width: 390)
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("Aether charge (Int(energy * 100)) percent")
+    .accessibilityLabel("\(trajectory.title) charge \(Int(energy * 100)) percent")
   }
 }
 
@@ -124,15 +135,14 @@ private struct FormationTraceCanvas: View {
     case rejected
   }
 
-  private let jade = Color(red: 0.66, green: 1, blue: 0.74)
   private let amber = Color(red: 1.0, green: 0.62, blue: 0.32)
 
   @State private var points: [NormalizedPoint] = []
-  @State private var feedback = "TRACE THE GLYPH"
   @State private var traceID = 0
   @State private var isDragging = false
   @State private var outcome: TraceOutcome?
   @State private var outcomeTime: TimeInterval?
+  @State private var liveCharge = 0.0
 
   var body: some View {
     TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
@@ -142,76 +152,152 @@ private struct FormationTraceCanvas: View {
         let template = FormationTrajectoryMatcher.template(for: trajectory)
         let breath = 0.5 + 0.5 * sin(time * 1.8)
         let outcomeAge = outcomeTime.map { time - $0 }
+        let style = guideStyle(at: time)
+        let displayedCharge = max(energy, liveCharge)
 
         ZStack {
-          trajectoryPath(template, in: size)
-            .stroke(Color.cyan.opacity(0.10 + breath * 0.05), lineWidth: 18)
-            .blur(radius: 9)
+          chargingHalo(
+            charge: displayedCharge,
+            isChanneling: isDragging,
+            size: size,
+            time: time,
+            style: style
+          )
 
           trajectoryPath(template, in: size)
             .stroke(
-              Color.cyan.opacity(0.36 + breath * 0.16),
-              style: StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: [4, 9])
+              style.primary.opacity(0.045 + breath * 0.035),
+              style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round)
+            )
+            .blur(radius: 7)
+
+          trajectoryPath(template, in: size)
+            .stroke(
+              style.primary.opacity(0.15 + breath * 0.1),
+              style: StrokeStyle(
+                lineWidth: 0.9 + breath * 0.45,
+                lineCap: .round,
+                lineJoin: .round
+              )
+            )
+            .shadow(color: style.primary.opacity(0.24), radius: 4)
+
+          trajectoryPath(template, in: size)
+            .stroke(
+              style.secondary.opacity(0.1 + breath * 0.09),
+              style: StrokeStyle(lineWidth: 0.6, lineCap: .round, dash: [2, 7, 12, 7])
             )
 
           trajectoryPath(template, in: size)
-            .trim(from: 0, to: min(0.98, CGFloat(energy)))
+            .trim(from: 0, to: min(0.98, CGFloat(displayedCharge)))
             .stroke(
               LinearGradient(
-                colors: [.cyan, jade],
+                colors: [style.primary, style.secondary],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
               ),
-              style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+              style: StrokeStyle(lineWidth: 3.2, lineCap: .round, lineJoin: .round)
             )
-            .shadow(color: .cyan.opacity(0.8), radius: 8)
+            .shadow(color: style.primary.opacity(0.72), radius: 7)
 
-          guideSpark(template: template, size: size, time: time)
+          guideSpark(template: template, size: size, time: time, style: style)
 
           if !points.isEmpty {
             trajectoryPath(points, in: size)
               .stroke(
-                LinearGradient(colors: [.white, .cyan], startPoint: .leading, endPoint: .trailing),
-                style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+                LinearGradient(
+                  colors: [style.secondary, style.primary],
+                  startPoint: .leading,
+                  endPoint: .trailing
+                ),
+                style: StrokeStyle(lineWidth: 3.6, lineCap: .round, lineJoin: .round)
               )
-              .shadow(color: .cyan, radius: 8)
+              .shadow(color: style.primary, radius: 8)
           }
 
           if isDragging, let head = points.last {
-            dragHead(point: head, size: size, time: time)
+            dragHead(point: head, size: size, time: time, style: style)
           }
 
           if let outcome, let outcomeAge, outcomeAge < 1 {
-            outcomeFX(outcome: outcome, age: outcomeAge, size: size, template: template)
+            outcomeFX(
+              outcome: outcome,
+              age: outcomeAge,
+              size: size,
+              template: template,
+              style: style
+            )
           }
 
-          VStack {
-            Spacer()
-            Text(feedback)
-              .font(.system(size: 9, weight: .medium, design: .monospaced))
-              .tracking(2.6)
-              .foregroundStyle(feedbackTint(outcomeAge: outcomeAge))
-              .padding(.bottom, 6)
-          }
         }
         .contentShape(Rectangle())
         .gesture(traceGesture(in: size))
-        .accessibilityLabel("Trace the (trajectory.title) formation path")
+        .accessibilityLabel("Trace the \(trajectory.title) formation path")
         .accessibilityHint("Drag along the glowing guide, or press Return to channel it")
         .onChange(of: trajectory) {
           points.removeAll()
-          feedback = "TRACE THE GLYPH"
           outcome = nil
           outcomeTime = nil
+          liveCharge = 0
         }
       }
     }
   }
 
+  /// Formation-wide charge feedback that fills continuously while the pointer follows the guide.
+  private func chargingHalo(
+    charge: Double,
+    isChanneling: Bool,
+    size: CGSize,
+    time: TimeInterval,
+    style: FormationVisualStyle
+  ) -> some View {
+    let diameter = min(size.width, size.height) * 0.95
+    let pulse = 1 + sin(time * (isChanneling ? 5.4 : 1.8)) * (isChanneling ? 0.018 : 0.006)
+
+    return ZStack {
+      Circle()
+        .stroke(
+          style.primary.opacity(isChanneling ? 0.2 : 0.08),
+          style: StrokeStyle(lineWidth: 1, dash: [2, 8])
+        )
+        .rotationEffect(.degrees(time * 12))
+
+      Circle()
+        .trim(from: 0, to: max(0.008, charge))
+        .stroke(
+          AngularGradient(
+            colors: [style.primary, style.secondary, style.flare, style.primary],
+            center: .center
+          ),
+          style: StrokeStyle(lineWidth: isChanneling ? 5 : 3, lineCap: .round)
+        )
+        .rotationEffect(.degrees(-90))
+        .shadow(color: style.primary.opacity(0.65 + charge * 0.3), radius: 7 + charge * 12)
+
+      ForEach(0..<5, id: \.self) { index in
+        let threshold = Double(index + 1) / 5
+        Circle()
+          .fill(charge >= threshold ? style.flare : style.primary.opacity(0.18))
+          .frame(width: charge >= threshold ? 7 : 4, height: charge >= threshold ? 7 : 4)
+          .shadow(color: style.primary, radius: charge >= threshold ? 8 : 0)
+          .offset(y: -diameter / 2)
+          .rotationEffect(.degrees(Double(index) * 72))
+      }
+    }
+    .frame(width: diameter, height: diameter)
+    .scaleEffect(pulse)
+    .blendMode(.plusLighter)
+    .allowsHitTesting(false)
+  }
+
   /// A spark traveling along the template to show the tracing direction.
-  private func guideSpark(template: [NormalizedPoint], size: CGSize, time: TimeInterval)
-    -> some View
-  {
+  private func guideSpark(
+    template: [NormalizedPoint],
+    size: CGSize,
+    time: TimeInterval,
+    style: FormationVisualStyle
+  ) -> some View {
     let fraction = (time * 0.13).truncatingRemainder(dividingBy: 1)
     let position = point(at: fraction, in: template, size: size)
     let trailPosition = point(
@@ -219,15 +305,15 @@ private struct FormationTraceCanvas: View {
 
     return ZStack {
       Circle()
-        .fill(Color.cyan.opacity(0.45))
-        .frame(width: 11, height: 11)
+        .fill(style.primary.opacity(0.45))
+        .frame(width: 8, height: 8)
         .blur(radius: 4)
         .position(trailPosition)
 
       Circle()
-        .fill(Color.white)
-        .frame(width: 5.5, height: 5.5)
-        .shadow(color: .cyan, radius: 8)
+        .fill(style.secondary)
+        .frame(width: 3.8, height: 3.8)
+        .shadow(color: style.primary, radius: 6)
         .position(position)
     }
     .blendMode(.plusLighter)
@@ -236,20 +322,25 @@ private struct FormationTraceCanvas: View {
   }
 
   /// Glowing comet head following the drag point.
-  private func dragHead(point: NormalizedPoint, size: CGSize, time: TimeInterval) -> some View {
-    let position = CGPoint(x: point.x * size.width, y: point.y * size.height)
+  private func dragHead(
+    point: NormalizedPoint,
+    size: CGSize,
+    time: TimeInterval,
+    style: FormationVisualStyle
+  ) -> some View {
+    let position = canvasPoint(point, in: size)
 
     return ZStack {
       Circle()
-        .stroke(Color.cyan.opacity(0.5), lineWidth: 1)
+        .stroke(style.primary.opacity(0.5), lineWidth: 1)
         .frame(width: 20 + sin(time * 6) * 4, height: 20 + sin(time * 6) * 4)
         .position(position)
 
       Circle()
-        .fill(Color.white)
+        .fill(style.secondary)
         .frame(width: 8, height: 8)
         .blur(radius: 1.5)
-        .shadow(color: .cyan, radius: 10)
+        .shadow(color: style.primary, radius: 10)
         .position(position)
     }
     .blendMode(.plusLighter)
@@ -258,9 +349,13 @@ private struct FormationTraceCanvas: View {
 
   /// Success ripples or a rejection flicker after the gesture ends.
   private func outcomeFX(
-    outcome: TraceOutcome, age: TimeInterval, size: CGSize, template: [NormalizedPoint]
+    outcome: TraceOutcome,
+    age: TimeInterval,
+    size: CGSize,
+    template: [NormalizedPoint],
+    style: FormationVisualStyle
   ) -> some View {
-    let maxDimension = max(size.width, size.height)
+    let maxDimension = min(size.width, size.height)
 
     return ZStack {
       switch outcome {
@@ -270,7 +365,8 @@ private struct FormationTraceCanvas: View {
           if progress > 0, progress < 1 {
             Circle()
               .stroke(
-                (wave == 0 ? Color.white : jade).opacity(pow(1 - progress, 1.3) * 0.8),
+                (wave == 0 ? Color.white : style.secondary).opacity(
+                  pow(1 - progress, 1.3) * 0.8),
                 lineWidth: (1 - progress) * 5 + 1
               )
               .frame(
@@ -284,7 +380,7 @@ private struct FormationTraceCanvas: View {
         if age < 0.5 {
           trajectoryPath(template, in: size)
             .stroke(Color.white.opacity((1 - age * 2) * 0.75), lineWidth: 3.5)
-            .shadow(color: jade, radius: 14)
+            .shadow(color: style.secondary, radius: 14)
         }
       case .partial:
         EmptyView()
@@ -299,21 +395,6 @@ private struct FormationTraceCanvas: View {
     .allowsHitTesting(false)
   }
 
-  private func feedbackTint(outcomeAge: TimeInterval?) -> Color {
-    guard let outcome, let outcomeAge, outcomeAge < 1.2 else {
-      return Color.cyan.opacity(0.72)
-    }
-
-    switch outcome {
-    case .complete:
-      return jade.opacity(0.95)
-    case .partial:
-      return Color.cyan.opacity(0.72)
-    case .rejected:
-      return amber.opacity(0.9)
-    }
-  }
-
   private func point(at fraction: Double, in template: [NormalizedPoint], size: CGSize) -> CGPoint {
     guard !template.isEmpty else { return .zero }
     let scaled = fraction * Double(template.count)
@@ -323,9 +404,12 @@ private struct FormationTraceCanvas: View {
     let a = template[lower]
     let b = template[upper]
 
-    return CGPoint(
-      x: (a.x + (b.x - a.x) * mix) * size.width,
-      y: (a.y + (b.y - a.y) * mix) * size.height
+    return canvasPoint(
+      NormalizedPoint(
+        x: a.x + (b.x - a.x) * mix,
+        y: a.y + (b.y - a.y) * mix
+      ),
+      in: size
     )
   }
 
@@ -336,21 +420,20 @@ private struct FormationTraceCanvas: View {
         let point = normalized(value.location, in: size)
         guard let previous = points.last else {
           points = [point]
-          feedback = "CHANNELING"
           return
         }
 
         guard hypot(point.x - previous.x, point.y - previous.y) > 0.006 else { return }
         points.append(point)
+        liveCharge = FormationTrajectoryMatcher.completion(points, for: trajectory)
       }
       .onEnded { value in
         isDragging = false
         points.append(normalized(value.location, in: size))
+        liveCharge = FormationTrajectoryMatcher.completion(points, for: trajectory)
         let score = FormationTrajectoryMatcher.score(points, for: trajectory)
-        feedback =
-          score >= 0.72
-          ? "RESONANCE COMPLETE" : score >= 0.35 ? "RESONANCE PARTIAL" : "GLYPH REJECTED"
-        outcome = score >= 0.72 ? .complete : score >= 0.35 ? .partial : .rejected
+        let activationThreshold = FormationTrajectoryMatcher.activationThreshold
+        outcome = score >= activationThreshold ? .complete : score >= 0.35 ? .partial : .rejected
         outcomeTime = Date().timeIntervalSinceReferenceDate
         onTrace(score)
 
@@ -361,15 +444,17 @@ private struct FormationTraceCanvas: View {
           guard currentTraceID == traceID else { return }
           withAnimation(.easeOut(duration: 0.24)) {
             points.removeAll()
+            liveCharge = 0
           }
         }
       }
   }
 
   private func normalized(_ point: CGPoint, in size: CGSize) -> NormalizedPoint {
-    NormalizedPoint(
-      x: max(0, min(1, point.x / size.width)),
-      y: max(0, min(1, point.y / size.height))
+    let bounds = formationBounds(in: size)
+    return NormalizedPoint(
+      x: max(0, min(1, (point.x - bounds.minX) / bounds.width)),
+      y: max(0, min(1, (point.y - bounds.minY) / bounds.height))
     )
   }
 
@@ -377,10 +462,42 @@ private struct FormationTraceCanvas: View {
     var path = Path()
     guard let first = pathPoints.first else { return path }
 
-    path.move(to: CGPoint(x: first.x * size.width, y: first.y * size.height))
+    path.move(to: canvasPoint(first, in: size))
     for point in pathPoints.dropFirst() {
-      path.addLine(to: CGPoint(x: point.x * size.width, y: point.y * size.height))
+      path.addLine(to: canvasPoint(point, in: size))
     }
     return path
+  }
+
+  private func canvasPoint(_ point: NormalizedPoint, in size: CGSize) -> CGPoint {
+    let bounds = formationBounds(in: size)
+    return CGPoint(
+      x: bounds.minX + point.x * bounds.width,
+      y: bounds.minY + point.y * bounds.height
+    )
+  }
+
+  private func formationBounds(in size: CGSize) -> CGRect {
+    let dimension = min(size.width, size.height)
+    return CGRect(
+      x: (size.width - dimension) / 2,
+      y: (size.height - dimension) / 2,
+      width: dimension,
+      height: dimension
+    )
+  }
+
+  private func guideStyle(at time: TimeInterval) -> FormationVisualStyle {
+    guard trajectory == .circle else { return trajectory.visualStyle }
+
+    let cycle = FivePhaseCycleState(time: time)
+    let activeElement =
+      cycle.opacity(for: cycle.next) > cycle.opacity(for: cycle.current)
+      ? cycle.next : cycle.current
+    return FormationVisualStyle(
+      primary: activeElement.color,
+      secondary: activeElement.color.opacity(0.82),
+      flare: activeElement.color
+    )
   }
 }

@@ -10,22 +10,33 @@ public enum FormationTrajectory: String, CaseIterable, Identifiable, Sendable {
   public var title: String {
     switch self {
     case .circle:
-      "Circle"
+      "Five Phases"
     case .infinity:
-      "Infinity"
+      "Bagua Flow"
     case .triangle:
-      "Triangle"
+      "Thunder Seal"
     }
   }
 
   public var symbol: String {
     switch self {
     case .circle:
-      "○"
+      "五"
     case .infinity:
-      "∞"
+      "卦"
     case .triangle:
-      "△"
+      "ϟ"
+    }
+  }
+
+  public var invocation: String {
+    switch self {
+    case .circle:
+      "FIVE PHASES · GENERATION CYCLE"
+    case .infinity:
+      "QIAN · KUN · ZHEN · XUN · KAN · LI · GEN · DUI"
+    case .triangle:
+      "CALL THE NINEFOLD THUNDER"
     }
   }
 }
@@ -41,6 +52,8 @@ public struct NormalizedPoint: Equatable, Sendable {
 }
 
 public enum FormationTrajectoryMatcher {
+  public static let activationThreshold = 0.64
+
   public static func template(
     for trajectory: FormationTrajectory,
     sampleCount: Int = 96
@@ -102,6 +115,20 @@ public enum FormationTrajectoryMatcher {
     let distance = min(forwardDistance, reverseDistance)
 
     return max(0, min(1, 1 - distance / 0.3))
+  }
+
+  /// Live charge based on how much of the guide's total path length has been drawn.
+  /// Accuracy is still decided by `score`; this only drives responsive visual feedback.
+  public static func completion(
+    _ points: [NormalizedPoint],
+    for trajectory: FormationTrajectory
+  ) -> Double {
+    guard points.count > 1 else { return 0 }
+
+    let targetLength = pathLength(template(for: trajectory))
+    guard targetLength > 0 else { return 0 }
+
+    return max(0, min(1, pathLength(points) / targetLength))
   }
 
   private static func normalize(_ points: [NormalizedPoint]) -> [NormalizedPoint]? {
@@ -176,5 +203,13 @@ public enum FormationTrajectoryMatcher {
 
   private static func distance(_ lhs: NormalizedPoint, _ rhs: NormalizedPoint) -> Double {
     hypot(lhs.x - rhs.x, lhs.y - rhs.y)
+  }
+
+  private static func pathLength(_ points: [NormalizedPoint]) -> Double {
+    guard points.count > 1 else { return 0 }
+
+    return zip(points, points.dropFirst()).reduce(0) { length, pair in
+      length + distance(pair.0, pair.1)
+    }
   }
 }

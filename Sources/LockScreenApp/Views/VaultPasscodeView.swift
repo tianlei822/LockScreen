@@ -192,7 +192,7 @@ struct VaultPasscodeView: View {
     case "submit":
       "Unlock vault"
     default:
-      "Digit (key)"
+      "Digit \(key)"
     }
   }
 }

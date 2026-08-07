@@ -58,6 +58,13 @@ final class LockFlowTests: XCTestCase {
     XCTAssertEqual(flow.phase, .unlocking)
   }
 
+  func testModeratelyAccurateFormationTraceActivatesGate() {
+    var flow = LockFlow(theme: .formation)
+
+    XCTAssertEqual(flow.applyFormationTrace(score: 0.66), .activated)
+    XCTAssertEqual(flow.phase, .unlocking)
+  }
+
   func testPartialFormationTraceChargesWithoutOpening() {
     var flow = LockFlow(theme: .formation)
 

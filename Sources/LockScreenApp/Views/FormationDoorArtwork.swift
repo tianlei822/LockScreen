@@ -4,11 +4,12 @@ import SwiftUI
 struct FormationDoorArtwork: View {
   let energy: Double
   let isActivated: Bool
+  let trajectory: FormationTrajectory
 
   private let ink = Color(red: 0.008, green: 0.025, blue: 0.048)
-  private let cyan = Color(red: 0.18, green: 0.91, blue: 0.84)
-  private let jade = Color(red: 0.52, green: 0.95, blue: 0.71)
-  private let gold = Color(red: 1.0, green: 0.82, blue: 0.45)
+  private var cyan: Color { trajectory.visualStyle.primary }
+  private var jade: Color { trajectory.visualStyle.secondary }
+  private var gold: Color { trajectory.visualStyle.flare }
 
   /// Eight trigrams used as the outer formation eyes (阵眼).
   private let trigrams = ["☰", "☱", "☲", "☳", "☴", "☵", "☶", "☷"]
@@ -33,42 +34,63 @@ struct FormationDoorArtwork: View {
             endPoint: .bottomTrailing
           )
 
+          if trajectory == .circle {
+            FivePhaseAnimeBackdrop(
+              time: time,
+              energy: level,
+              isActivated: isActivated
+            )
+          }
+
+          if trajectory == .triangle {
+            LightningStormField(
+              style: trajectory.visualStyle,
+              time: time,
+              energy: level,
+              isActivated: isActivated,
+              seedOffset: 73,
+              presentation: .backdrop
+            )
+          }
+
           vignette(size: size)
 
           godRays(diameter: diameter, time: time, level: level)
 
           formationLattice(size: size, time: time)
 
-          polarLattice(size: size, diameter: diameter)
+          polarLattice(size: size, diameter: diameter, time: time)
 
           groundGlow(diameter: diameter, level: level, time: time)
 
           // Concentric rings ignite from the outside in as aether charge grows.
           ring(
             diameter: diameter, dash: [2, 10], lineWidth: 1.2,
-            brightness: ignition(level: level, index: 0, of: 4)
+            brightness: ignition(level: level, index: 0, of: 4), time: time, phase: 0
           )
           .rotationEffect(.degrees(time * 14 * speed))
 
           ring(
             diameter: diameter * 0.74, dash: [20, 7, 3, 7], lineWidth: 1.8,
-            brightness: ignition(level: level, index: 1, of: 4)
+            brightness: ignition(level: level, index: 1, of: 4), time: time, phase: 1.3
           )
           .rotationEffect(.degrees(-time * 22 * speed))
 
           ring(
             diameter: diameter * 0.52, dash: [], lineWidth: 0.8,
-            brightness: ignition(level: level, index: 2, of: 4)
+            brightness: ignition(level: level, index: 2, of: 4), time: time, phase: 2.6
           )
           .rotationEffect(.degrees(-time * 7 * speed))
 
           ring(
             diameter: diameter * 0.4, dash: [12, 5], lineWidth: 1,
-            brightness: ignition(level: level, index: 3, of: 4)
+            brightness: ignition(level: level, index: 3, of: 4), time: time, phase: 3.9
           )
           .rotationEffect(.degrees(time * 17 * speed))
 
-          trigramBand(diameter: diameter * 0.93, time: time, level: level)
+          if trajectory == .infinity {
+            trigramBand(diameter: diameter * 0.93, time: time, level: level)
+          }
 
           radialTicks(diameter: diameter * 0.845)
             .rotationEffect(.degrees(time * 4 * speed))
@@ -77,18 +99,28 @@ struct FormationDoorArtwork: View {
 
           FormationPolygon(sides: 8)
             .stroke(
-              cyan.opacity(0.30 + 0.32 * level), style: StrokeStyle(lineWidth: 1, dash: [5, 7])
+              cyan.opacity(0.30 + 0.32 * level),
+              style: StrokeStyle(
+                lineWidth: 0.75 + (0.5 + 0.5 * sin(time * 2.1)) * 1.05 + level * 0.45,
+                dash: [5, 7]
+              )
             )
             .frame(width: diameter * 0.64, height: diameter * 0.64)
             .rotationEffect(.degrees(time * 9 * speed))
 
           FormationPolygon(sides: 3)
-            .stroke(jade.opacity(0.34 + 0.3 * level), lineWidth: 1.5)
+            .stroke(
+              jade.opacity(0.34 + 0.3 * level),
+              lineWidth: 1 + (0.5 + 0.5 * sin(time * 2.7 + 1.1)) * 1.5 + level * 0.6
+            )
             .frame(width: diameter * 0.48, height: diameter * 0.48)
             .rotationEffect(.degrees(-time * 15 * speed))
 
           FormationPolygon(sides: 6)
-            .stroke(cyan.opacity(0.18 + level * 0.45), lineWidth: 1)
+            .stroke(
+              cyan.opacity(0.18 + level * 0.45),
+              lineWidth: 0.55 + (0.5 + 0.5 * sin(time * 3.2 + 2.4)) * 0.9 + level * 0.4
+            )
             .frame(width: diameter * 0.34, height: diameter * 0.34)
             .rotationEffect(.degrees(time * 21 * speed))
 
@@ -107,6 +139,14 @@ struct FormationDoorArtwork: View {
 
           centerCore(
             diameter: diameter, time: time, level: level, speed: speed, activationAge: activationAge
+          )
+
+          FormationDisciplineLayer(
+            trajectory: trajectory,
+            diameter: diameter,
+            time: time,
+            energy: level,
+            isActivated: isActivated
           )
 
           doorSeam(level: level)
@@ -158,7 +198,7 @@ struct FormationDoorArtwork: View {
   }
 
   private func groundGlow(diameter: CGFloat, level: Double, time: TimeInterval) -> some View {
-    Circle()
+    return Circle()
       .fill(
         RadialGradient(
           colors: [cyan.opacity(0.10 + level * 0.12), cyan.opacity(0.04), .clear],
@@ -178,38 +218,56 @@ struct FormationDoorArtwork: View {
       let spacing: CGFloat = 34
       let drift = CGFloat(time.truncatingRemainder(dividingBy: 3)) * 3
 
-      for x in stride(from: -size.height, through: size.width + size.height, by: spacing) {
+      for (index, x) in stride(
+        from: -size.height,
+        through: size.width + size.height,
+        by: spacing
+      ).enumerated() {
+        let forwardWave = 0.5 + 0.5 * sin(time * 1.7 + Double(index) * 0.72)
+        let backwardWave = 0.5 + 0.5 * sin(time * 1.45 - Double(index) * 0.61)
         var forward = Path()
         forward.move(to: CGPoint(x: x + drift, y: 0))
         forward.addLine(to: CGPoint(x: x - size.height + drift, y: size.height))
-        context.stroke(forward, with: .color(cyan.opacity(0.045)), lineWidth: 0.6)
+        context.stroke(
+          forward,
+          with: .color(cyan.opacity(0.028 + forwardWave * 0.032)),
+          lineWidth: 0.32 + CGFloat(index % 4) * 0.16 + forwardWave * 0.5
+        )
 
         var backward = Path()
         backward.move(to: CGPoint(x: x - drift, y: 0))
         backward.addLine(to: CGPoint(x: x + size.height - drift, y: size.height))
-        context.stroke(backward, with: .color(jade.opacity(0.03)), lineWidth: 0.6)
+        context.stroke(
+          backward,
+          with: .color(jade.opacity(0.02 + backwardWave * 0.026)),
+          lineWidth: 0.28 + CGFloat(index % 3) * 0.2 + backwardWave * 0.42
+        )
       }
     }
   }
 
   /// Concentric guide circles with radial spokes, like the engraved base of an array disc.
-  private func polarLattice(size: CGSize, diameter: CGFloat) -> some View {
+  private func polarLattice(size: CGSize, diameter: CGFloat, time: TimeInterval) -> some View {
     Canvas { context, _ in
       let center = CGPoint(x: size.width / 2, y: size.height / 2)
 
       for step in 1...6 {
+        let wave = 0.5 + 0.5 * sin(time * (1.4 + Double(step) * 0.13) + Double(step))
         let radius = diameter * 0.5 * CGFloat(step) / 6
         let rect = CGRect(
           x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
         context.stroke(
           Path(ellipseIn: rect),
-          with: .color(cyan.opacity(step.isMultiple(of: 2) ? 0.055 : 0.035)),
-          lineWidth: 0.5
+          with: .color(
+            cyan.opacity((step.isMultiple(of: 2) ? 0.04 : 0.025) + wave * 0.035)
+          ),
+          lineWidth: 0.3 + CGFloat(step % 3) * 0.22 + wave * 0.5
         )
       }
 
       for index in 0..<24 {
         let angle = Double(index) * .pi / 12
+        let wave = 0.5 + 0.5 * sin(time * 1.9 - Double(index) * 0.48)
         var path = Path()
         path.move(
           to: CGPoint(
@@ -223,8 +281,10 @@ struct FormationDoorArtwork: View {
           ))
         context.stroke(
           path,
-          with: .color(cyan.opacity(index.isMultiple(of: 3) ? 0.09 : 0.04)),
-          lineWidth: index.isMultiple(of: 3) ? 0.8 : 0.5
+          with: .color(
+            cyan.opacity((index.isMultiple(of: 3) ? 0.055 : 0.025) + wave * 0.045)
+          ),
+          lineWidth: (index.isMultiple(of: 3) ? 0.7 : 0.3) + wave * 0.55
         )
       }
     }
@@ -237,17 +297,30 @@ struct FormationDoorArtwork: View {
     max(0, min(1, level * Double(total) - Double(index)))
   }
 
-  private func ring(diameter: CGFloat, dash: [CGFloat], lineWidth: CGFloat, brightness: Double)
+  private func ring(
+    diameter: CGFloat,
+    dash: [CGFloat],
+    lineWidth: CGFloat,
+    brightness: Double,
+    time: TimeInterval,
+    phase: Double
+  )
     -> some View
   {
-    Circle()
+    let wave = 0.5 + 0.5 * sin(time * (1.8 + phase * 0.08) + phase)
+
+    return Circle()
       .trim(from: 0.035, to: 0.965)
       .stroke(
         AngularGradient(
           colors: [cyan.opacity(0.18), cyan, jade, cyan.opacity(0.18)],
           center: .center
         ),
-        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, dash: dash)
+        style: StrokeStyle(
+          lineWidth: lineWidth * (0.65 + wave * 0.7 + brightness * 0.3),
+          lineCap: .round,
+          dash: dash
+        )
       )
       .frame(width: diameter, height: diameter)
       .opacity(0.3 + 0.7 * brightness)

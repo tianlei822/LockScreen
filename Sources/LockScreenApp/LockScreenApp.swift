@@ -2,31 +2,18 @@ import AppKit
 import LockScreenCore
 import SwiftUI
 
-@main
-struct LockScreenApp: App {
-  @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+enum AppConfiguration {
+  /// `--background`: lurk windowless and summon the ritual with ⌘L instead.
+  static let backgroundMode = ProcessInfo.processInfo.arguments.contains("--background")
 
-  var body: some Scene {
-    WindowGroup {
-      LockScreenView(
-        initialTheme: initialTheme,
-        vaultPasscode: configuredVaultPasscode
-      )
-      .frame(minWidth: 900, minHeight: 640)
-    }
-    .defaultSize(width: 1180, height: 780)
-    .windowStyle(.hiddenTitleBar)
-    .windowResizability(.contentMinSize)
-  }
-
-  private var initialTheme: DoorTheme {
+  static var initialTheme: DoorTheme {
     let arguments = ProcessInfo.processInfo.arguments
     if arguments.contains("--vault") { return .vault }
     if arguments.contains("--formation") { return .formation }
     return .wood
   }
 
-  private var configuredVaultPasscode: String {
+  static var vaultPasscode: String {
     let prefix = "--passcode="
     guard
       let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) })
@@ -42,9 +29,31 @@ struct LockScreenApp: App {
   }
 }
 
+@main
+struct LockScreenApp: App {
+  @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
+  var body: some Scene {
+    WindowGroup {
+      LockScreenView(
+        initialTheme: AppConfiguration.initialTheme,
+        vaultPasscode: AppConfiguration.vaultPasscode,
+        backgroundMode: AppConfiguration.backgroundMode
+      )
+      .frame(minWidth: 900, minHeight: 640)
+    }
+    .defaultSize(width: 1180, height: 780)
+    .windowStyle(.hiddenTitleBar)
+    .windowResizability(.contentMinSize)
+  }
+}
+
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   private var screenObserver: NSObjectProtocol?
+  private var workspaceObservers: [NSObjectProtocol] = []
+  private var statusItem: NSStatusItem?
+  private var hotKey: GlobalHotKey?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     screenObserver = NotificationCenter.default.addObserver(
@@ -57,19 +66,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       }
     }
 
+    let workspaceCenter = NSWorkspace.shared.notificationCenter
+    for name in [NSWorkspace.sessionDidBecomeActiveNotification, NSWorkspace.didWakeNotification] {
+      workspaceObservers.append(
+        workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { _ in
+          Task { @MainActor in
+            WindowPresentation.refreshScreenCovers()
+          }
+        })
+    }
+
+    if AppConfiguration.backgroundMode {
+      NSApp.setActivationPolicy(.accessory)
+      installStatusItem()
+    }
+
+    hotKey = GlobalHotKey { [weak self] in
+      self?.presentRitual()
+    }
+    if hotKey?.register() != true {
+      FileHandle.standardError.write(
+        Data("Threshold: could not register ⌘L (already taken?)\n".utf8))
+    }
+
     Task { @MainActor in
       try? await Task.sleep(for: .milliseconds(300))
-      guard let window = NSApp.windows.first else { return }
+      guard let window = WindowPresentation.mainRitualWindow() else { return }
 
       window.titleVisibility = .hidden
       window.titlebarAppearsTransparent = true
       window.backgroundColor = .black
+      window.delegate = self
 
       let opensWindowed = ProcessInfo.processInfo.arguments.contains("--windowed")
-      if !opensWindowed {
+      if AppConfiguration.backgroundMode {
+        window.orderOut(nil)
+      } else if !opensWindowed {
         WindowPresentation.enterImmersive(window)
       }
     }
+  }
+
+  /// ⌘L (or the status menu): show the ritual and take over the screen.
+  func presentRitual() {
+    guard let window = WindowPresentation.mainRitualWindow(),
+      !WindowPresentation.isImmersive(window)
+    else { return }
+
+    WindowPresentation.enterImmersive(window)
   }
 
   func applicationDidBecomeActive(_ notification: Notification) {
@@ -83,8 +127,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
+  func applicationWillTerminate(_ notification: Notification) {
+    IdleSuppression.end()
+    hotKey?.unregister()
+    if let screenObserver {
+      NotificationCenter.default.removeObserver(screenObserver)
+    }
+    let workspaceCenter = NSWorkspace.shared.notificationCenter
+    for observer in workspaceObservers {
+      workspaceCenter.removeObserver(observer)
+    }
+  }
+
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    true
+    !AppConfiguration.backgroundMode
+  }
+
+  /// In background mode the window is only hidden, never closed, so ⌘L can
+  /// always bring the same ritual back.
+  func windowShouldClose(_ sender: NSWindow) -> Bool {
+    guard AppConfiguration.backgroundMode else { return true }
+    sender.orderOut(nil)
+    return false
+  }
+
+  private func installStatusItem() {
+    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    if let button = item.button {
+      let image = NSImage(
+        systemSymbolName: "lock", accessibilityDescription: "Threshold"
+      )?.withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
+      image?.isTemplate = true
+
+      let imageView = NSImageView(image: image ?? NSImage())
+      imageView.imageScaling = .scaleProportionallyDown
+      imageView.contentTintColor = .labelColor
+      imageView.translatesAutoresizingMaskIntoConstraints = false
+
+      // `isBordered = false` only removes the bezel. The status-bar button can
+      // still draw its own dark backing when highlighted, so make the button
+      // fully transparent and render the template symbol in a child view.
+      button.image = nil
+      button.title = ""
+      button.isBordered = false
+      button.isTransparent = true
+      button.addSubview(imageView)
+      button.setAccessibilityLabel("Threshold")
+
+      NSLayoutConstraint.activate([
+        imageView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+        imageView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+        imageView.widthAnchor.constraint(equalToConstant: 15),
+        imageView.heightAnchor.constraint(equalToConstant: 15),
+      ])
+    }
+
+    let menu = NSMenu()
+    let lockItem = NSMenuItem(
+      title: "Lock Now (⌘L)", action: #selector(lockNowFromMenu), keyEquivalent: "")
+    lockItem.target = self
+    menu.addItem(lockItem)
+    menu.addItem(.separator())
+    let quitItem = NSMenuItem(
+      title: "Quit Threshold", action: #selector(quitFromMenu), keyEquivalent: "")
+    quitItem.target = self
+    menu.addItem(quitItem)
+
+    item.menu = menu
+    statusItem = item
+  }
+
+  @objc private func lockNowFromMenu() {
+    presentRitual()
+  }
+
+  @objc private func quitFromMenu() {
+    NSApp.terminate(nil)
   }
 }
 
@@ -104,13 +222,21 @@ enum WindowPresentation {
   ]
 
   private static var screenCovers: [NSWindow] = []
+  private static var ritualWindow: NSWindow?
+  private static var coverageReassertionTask: Task<Void, Never>?
+
+  /// The ritual window, as opposed to a secondary-display cover.
+  static func mainRitualWindow() -> NSWindow? {
+    ritualWindow ?? NSApp.windows.first { !screenCovers.contains($0) }
+  }
 
   static func toggle(_ window: NSWindow?) {
     guard let window else { return }
     isImmersive(window) ? enterWindowed(window) : enterImmersive(window)
   }
 
-  static func enterImmersive(_ window: NSWindow) {
+  static func enterImmersive(_ sourceWindow: NSWindow) {
+    let window = dedicatedRitualWindow(from: sourceWindow)
     guard let screen = window.screen ?? NSScreen.main else { return }
 
     window.level = .screenSaver
@@ -121,28 +247,33 @@ enum WindowPresentation {
     window.hasShadow = false
     setWindowButtonsHidden(true, in: window)
 
-    // Kiosk options only apply while the app is frontmost, and unbundled
-    // `swift run` binaries may need an explicit activation policy first.
-    NSApp.setActivationPolicy(.regular)
+    // Keep background mode status-bar-only. Normal and unbundled launches
+    // still need the regular activation policy to become frontmost.
+    if !AppConfiguration.backgroundMode {
+      NSApp.setActivationPolicy(.regular)
+    }
     window.makeKeyAndOrderFront(nil)
     NSApp.activate()
     NSApp.presentationOptions = kioskOptions
 
-    // Frame after the kiosk options: while the menu bar and Dock are still
-    // visible, AppKit clamps window frames to the visible frame. Overscan
-    // pushes the window's rounded corners off the visible area.
-    window.setFrame(screen.frame.insetBy(dx: -12, dy: -12), display: true)
+    // A borderless window can match the display exactly. Standard titled
+    // windows get re-constrained after wake/Space changes and expose their
+    // rounded corners even when their frame is temporarily overscanned.
+    window.setFrame(screen.frame, display: true)
 
+    IdleSuppression.begin()
     coverSecondaryScreens(except: screen)
+    window.styleMask = [.borderless]
+    scheduleCoverageReassertion()
   }
 
   /// Kiosk options only apply while the app is frontmost; re-assert them
   /// when focus returns or something briefly steals it mid-ritual. The frame
-  /// is re-applied too because the first attempt can be clamped while the
-  /// menu bar and Dock are still animating out.
+  /// is re-applied too because the display can briefly report an intermediate
+  /// frame while the menu bar, Dock, Space, or login session is transitioning.
   static func reassertKiosk() {
     guard !NSApp.isHidden,
-      let window = NSApp.windows.first(where: { !screenCovers.contains($0) }),
+      let window = mainRitualWindow(),
       isImmersive(window),
       let screen = window.screen
     else { return }
@@ -152,29 +283,50 @@ enum WindowPresentation {
       NSApp.activate()
     }
 
-    let target = screen.frame.insetBy(dx: -12, dy: -12)
+    window.level = .screenSaver
+    window.hasShadow = false
+
+    let target = screen.frame
     if window.frame != target {
       window.setFrame(target, display: true)
     }
+    window.orderFrontRegardless()
+    window.styleMask = [.borderless]
   }
 
   /// Re-blank secondary displays after a display is (dis)connected mid-session.
   static func refreshScreenCovers() {
-    guard let window = NSApp.windows.first(where: { !screenCovers.contains($0) }),
+    guard let window = mainRitualWindow(),
       isImmersive(window),
       let screen = window.screen
     else { return }
 
     reassertKiosk()
     coverSecondaryScreens(except: screen)
+    scheduleCoverageReassertion()
+  }
+
+  /// Background mode: after a completed ritual, re-seal and lurk until ⌘L.
+  static func retreatToBackground(_ window: NSWindow?) {
+    coverageReassertionTask?.cancel()
+    dismissScreenCovers()
+    NSApp.presentationOptions = []
+    IdleSuppression.end()
+
+    window?.level = .normal
+    window?.orderOut(nil)
+    NSApp.setActivationPolicy(.accessory)
   }
 
   private static func enterWindowed(_ window: NSWindow) {
     guard let screen = window.screen ?? NSScreen.main else { return }
 
+    coverageReassertionTask?.cancel()
     dismissScreenCovers()
     NSApp.presentationOptions = []
+    IdleSuppression.end()
 
+    window.styleMask = [.borderless]
     window.level = .normal
     window.collectionBehavior = [.fullScreenPrimary]
     window.titleVisibility = .hidden
@@ -193,6 +345,59 @@ enum WindowPresentation {
       y: visibleFrame.midY - size.height / 2
     )
     window.setFrame(NSRect(origin: origin, size: size), display: true, animate: true)
+  }
+
+  /// AppKit finishes hiding system UI and restoring a login session over
+  /// several run-loop turns. Re-apply the exact display frame during that
+  /// transition instead of relying on a single timing-sensitive assignment.
+  private static func scheduleCoverageReassertion() {
+    coverageReassertionTask?.cancel()
+    coverageReassertionTask = Task { @MainActor in
+      for delay in [150, 350, 700, 2_000] {
+        do {
+          try await Task.sleep(for: .milliseconds(delay))
+        } catch {
+          return
+        }
+        reassertKiosk()
+      }
+    }
+  }
+
+  /// SwiftUI owns the WindowGroup style and can restore its title bar after a
+  /// kiosk or login-session transition. Keep that scene window hidden and
+  /// render the ritual in a dedicated AppKit borderless window instead.
+  private static func dedicatedRitualWindow(from sourceWindow: NSWindow) -> NSWindow {
+    if let ritualWindow {
+      return ritualWindow
+    }
+
+    let frame = sourceWindow.screen?.frame ?? NSScreen.main?.frame ?? sourceWindow.frame
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.borderless],
+      backing: .buffered,
+      defer: false
+    )
+    window.title = "Threshold"
+    window.backgroundColor = .black
+    window.isOpaque = true
+    window.hasShadow = false
+    window.isReleasedWhenClosed = false
+    window.delegate = sourceWindow.delegate
+
+    let hostingView = NSHostingView(
+      rootView: LockScreenView(
+        initialTheme: AppConfiguration.initialTheme,
+        vaultPasscode: AppConfiguration.vaultPasscode,
+        backgroundMode: AppConfiguration.backgroundMode
+      ))
+    hostingView.autoresizingMask = [.width, .height]
+    window.contentView = hostingView
+
+    sourceWindow.orderOut(nil)
+    ritualWindow = window
+    return window
   }
 
   private static func coverSecondaryScreens(except covered: NSScreen) {
@@ -223,7 +428,7 @@ enum WindowPresentation {
     screenCovers.removeAll()
   }
 
-  private static func isImmersive(_ window: NSWindow) -> Bool {
+  static func isImmersive(_ window: NSWindow) -> Bool {
     window.level == .screenSaver
   }
 

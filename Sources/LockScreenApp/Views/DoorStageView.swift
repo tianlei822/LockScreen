@@ -10,6 +10,8 @@ struct DoorStageView: View {
   let theme: DoorTheme
   let phase: LockPhase
   let formationEnergy: Double
+  let formationTrajectory: FormationTrajectory
+  let woodKnockCount: Int
 
   private var isOpen: Bool { phase != .awaitingSequence }
 
@@ -59,6 +61,8 @@ struct DoorStageView: View {
           .opacity(isOpen ? 0.8 : 0)
           .blendMode(.plusLighter)
           .allowsHitTesting(false)
+
+        ThresholdDetailOverlay(theme: theme, isOpen: isOpen)
       }
       .background(Color.black)
       .clipped()
@@ -69,11 +73,17 @@ struct DoorStageView: View {
   }
 
   private func leaf(side: DoorSide, fullSize: CGSize) -> some View {
-    DoorArtworkView(theme: theme, phase: phase, formationEnergy: formationEnergy)
-      .frame(width: fullSize.width, height: fullSize.height)
-      .offset(x: side == .left ? fullSize.width / 4 : -fullSize.width / 4)
-      .frame(width: fullSize.width / 2, height: fullSize.height)
-      .clipped()
+    DoorArtworkView(
+      theme: theme,
+      phase: phase,
+      formationEnergy: formationEnergy,
+      formationTrajectory: formationTrajectory,
+      woodKnockCount: woodKnockCount
+    )
+    .frame(width: fullSize.width, height: fullSize.height)
+    .offset(x: side == .left ? fullSize.width / 4 : -fullSize.width / 4)
+    .frame(width: fullSize.width / 2, height: fullSize.height)
+    .clipped()
   }
 }
 
@@ -81,16 +91,19 @@ private struct DoorArtworkView: View {
   let theme: DoorTheme
   let phase: LockPhase
   let formationEnergy: Double
+  let formationTrajectory: FormationTrajectory
+  let woodKnockCount: Int
 
   @ViewBuilder
   var body: some View {
     switch theme {
     case .wood:
-      WoodenDoorArtwork()
+      WoodenDoorArtwork(knockCount: woodKnockCount)
     case .formation:
       FormationDoorArtwork(
         energy: formationEnergy,
-        isActivated: phase != .awaitingSequence
+        isActivated: phase != .awaitingSequence,
+        trajectory: formationTrajectory
       )
     case .vault:
       VaultDoorArtwork()

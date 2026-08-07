@@ -33,4 +33,15 @@ final class FormationTrajectoryTests: XCTestCase {
 
     XCTAssertEqual(FormationTrajectoryMatcher.score(points, for: .circle), 0)
   }
+
+  func testTraceCompletionTracksHowMuchOfTheFormationWasDrawn() {
+    let template = FormationTrajectoryMatcher.template(for: .circle, sampleCount: 96)
+
+    let halfCharge = FormationTrajectoryMatcher.completion(
+      Array(template.prefix(template.count / 2)), for: .circle)
+    let fullCharge = FormationTrajectoryMatcher.completion(template, for: .circle)
+
+    XCTAssertEqual(halfCharge, 0.5, accuracy: 0.08)
+    XCTAssertGreaterThan(fullCharge, 0.95)
+  }
 }

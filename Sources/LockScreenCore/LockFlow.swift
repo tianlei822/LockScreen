@@ -189,7 +189,7 @@ public struct LockFlow: Equatable, Sendable {
     }
 
     let boundedScore = max(0, min(1, score))
-    if boundedScore >= 0.72 {
+    if boundedScore >= FormationTrajectoryMatcher.activationThreshold {
       formationEnergy = 1
       phase = .unlocking
       return .activated
