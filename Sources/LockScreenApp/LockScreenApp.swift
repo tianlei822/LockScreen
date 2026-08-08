@@ -219,17 +219,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
       // fully transparent and render the template symbol in a child view.
       button.image = nil
       button.title = ""
-      button.isBordered = false
-      button.isTransparent = true
-      if let buttonCell = button.cell as? NSButtonCell {
-        buttonCell.highlightsBy = []
-        buttonCell.showsStateBy = []
-      }
       button.addSubview(imageView)
       button.target = self
       button.action = #selector(showStatusMenu(_:))
       button.setAccessibilityLabel("Threshold")
-      clearStatusItemHighlight(button)
+      applyTransparentStatusItemAppearance(to: button)
+
+      // NSStatusBar may update its button after the item is attached. Reapply
+      // on the next main-loop turn so that update cannot restore the backing.
+      DispatchQueue.main.async { [weak self, weak button] in
+        self?.applyTransparentStatusItemAppearance(to: button)
+      }
 
       NSLayoutConstraint.activate([
         imageView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
@@ -263,21 +263,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
   @objc private func showStatusMenu(_ sender: NSStatusBarButton) {
     guard let statusMenu else { return }
 
-    clearStatusItemHighlight(sender)
+    applyTransparentStatusItemAppearance(to: sender)
     statusMenu.popUp(positioning: nil, at: .zero, in: sender)
-    clearStatusItemHighlight(sender)
+    applyTransparentStatusItemAppearance(to: sender)
   }
 
   func menuWillOpen(_ menu: NSMenu) {
-    clearStatusItemHighlight()
+    applyTransparentStatusItemAppearance()
   }
 
   func menuDidClose(_ menu: NSMenu) {
-    clearStatusItemHighlight()
+    applyTransparentStatusItemAppearance()
   }
 
-  private func clearStatusItemHighlight(_ button: NSStatusBarButton? = nil) {
+  private func applyTransparentStatusItemAppearance(to button: NSStatusBarButton? = nil) {
     guard let button = button ?? statusItem?.button else { return }
+    button.isBordered = false
+    button.isTransparent = true
+    if let buttonCell = button.cell as? NSButtonCell {
+      buttonCell.highlightsBy = []
+      buttonCell.showsStateBy = []
+      buttonCell.isHighlighted = false
+    }
     button.state = .off
     button.highlight(false)
     button.needsDisplay = true
