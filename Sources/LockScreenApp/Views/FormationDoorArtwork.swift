@@ -17,7 +17,9 @@ struct FormationDoorArtwork: View {
   @State private var activationStart: TimeInterval?
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
+    TimelineView(
+      .animation(minimumInterval: trajectory == .circle ? 1 / 24 : 1 / 20)
+    ) { timeline in
       GeometryReader { proxy in
         let size = proxy.size
         let time = timeline.date.timeIntervalSinceReferenceDate
@@ -40,6 +42,7 @@ struct FormationDoorArtwork: View {
               energy: level,
               isActivated: isActivated
             )
+            .equatable()
           }
 
           if trajectory == .triangle {
@@ -312,9 +315,10 @@ struct FormationDoorArtwork: View {
     return Circle()
       .trim(from: 0.035, to: 0.965)
       .stroke(
-        AngularGradient(
+        LinearGradient(
           colors: [cyan.opacity(0.18), cyan, jade, cyan.opacity(0.18)],
-          center: .center
+          startPoint: .topLeading,
+          endPoint: .bottomTrailing
         ),
         style: StrokeStyle(
           lineWidth: lineWidth * (0.65 + wave * 0.7 + brightness * 0.3),
@@ -331,7 +335,11 @@ struct FormationDoorArtwork: View {
       Circle()
         .trim(from: 0.01, to: max(0.012, CGFloat(level)))
         .stroke(
-          AngularGradient(colors: [cyan, jade, .white, cyan], center: .center),
+          LinearGradient(
+            colors: [cyan, jade, .white, cyan],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          ),
           style: StrokeStyle(lineWidth: 4, lineCap: .round)
         )
         .rotationEffect(.degrees(-90))
