@@ -1,7 +1,8 @@
 #!/bin/sh
 
-# Installs (or with --uninstall, removes) a LaunchAgent that starts Threshold
-# in background mode at login, so ⌘L summons the lock ritual anytime.
+# Configures (or with --uninstall, removes) a LaunchAgent that starts Threshold
+# in background mode at login, so ⌘L summons the lock ritual anytime. Pass
+# --workspace to run the signed bundle from .build without installing a copy.
 
 set -eu
 
@@ -10,15 +11,26 @@ plist="$HOME/Library/LaunchAgents/$label.plist"
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 source_app="$project_root/.build/Threshold.app"
 installed_app=${THRESHOLD_INSTALL_PATH:-$HOME/Applications/Threshold.app}
-binary="$installed_app/Contents/MacOS/LockScreen"
 domain="gui/$(id -u)"
+mode=${1:-}
 
-if [ "${1:-}" = "--uninstall" ]; then
+if [ "$mode" = "--uninstall" ]; then
   launchctl bootout "$domain/$label" 2>/dev/null || true
   rm -f "$plist"
-  echo "removed $label; kept $installed_app"
+  echo "removed $label"
   exit 0
 fi
+
+if [ "$mode" = "--workspace" ]; then
+  runtime_app="$source_app"
+elif [ -z "$mode" ]; then
+  runtime_app="$installed_app"
+else
+  echo "usage: $0 [--workspace | --uninstall]" >&2
+  exit 2
+fi
+
+binary="$runtime_app/Contents/MacOS/LockScreen"
 
 if [ ! -x "$source_app/Contents/MacOS/LockScreen" ]; then
   echo "bundle not found at $source_app — run sh Scripts/build-app.sh first" >&2
@@ -32,9 +44,11 @@ if printf '%s\n' "$source_requirement" | /usr/bin/grep -Fq "cdhash "; then
   exit 1
 fi
 
-mkdir -p "$(dirname -- "$installed_app")"
-/usr/bin/ditto --rsrc --extattr "$source_app" "$installed_app"
-/usr/bin/codesign --verify --deep --strict "$installed_app"
+if [ "$mode" != "--workspace" ]; then
+  mkdir -p "$(dirname -- "$installed_app")"
+  /usr/bin/ditto --rsrc --extattr "$source_app" "$installed_app"
+  /usr/bin/codesign --verify --deep --strict "$installed_app"
+fi
 
 cat > "$plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -82,4 +96,8 @@ until launchctl print "$domain/$label" 2>/dev/null | /usr/bin/grep -Fq "state = 
   sleep 0.1
 done
 
-echo "installed $label at $installed_app — Threshold stays ready in the background; press ⌘L to lock"
+if [ "$mode" = "--workspace" ]; then
+  echo "started $label from $source_app — no app copy installed; press ⌘L to lock"
+else
+  echo "installed $label at $installed_app — Threshold stays ready in the background; press ⌘L to lock"
+fi

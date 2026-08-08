@@ -9,8 +9,8 @@ enum AppConfiguration {
   static var initialTheme: DoorTheme {
     let arguments = ProcessInfo.processInfo.arguments
     if arguments.contains("--vault") { return .vault }
-    if arguments.contains("--formation") { return .formation }
-    return .wood
+    if arguments.contains("--wood") { return .wood }
+    return .formation
   }
 
   static var vaultPasscode: String {
@@ -49,11 +49,20 @@ struct LockScreenApp: App {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
   private var screenObserver: NSObjectProtocol?
   private var workspaceObservers: [NSObjectProtocol] = []
   private var statusItem: NSStatusItem?
+  private var statusMenu: NSMenu?
   private var hotKey: GlobalHotKey?
+
+  func applicationWillFinishLaunching(_ notification: Notification) {
+    guard AppConfiguration.backgroundMode else { return }
+
+    // Establish accessory/background semantics before SwiftUI creates its
+    // WindowGroup so the scene never receives an initial foreground frame.
+    NSApp.setActivationPolicy(.accessory)
+  }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     screenObserver = NotificationCenter.default.addObserver(
@@ -78,6 +87,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     if AppConfiguration.backgroundMode {
       NSApp.setActivationPolicy(.accessory)
+      for window in NSApp.windows {
+        window.orderOut(nil)
+      }
+      NSApp.hide(nil)
       installStatusItem()
     }
 
@@ -113,6 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       !WindowPresentation.isImmersive(window)
     else { return }
 
+    NSApp.unhide(nil)
     WindowPresentation.enterImmersive(window)
   }
 
@@ -171,8 +185,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       button.title = ""
       button.isBordered = false
       button.isTransparent = true
+      if let buttonCell = button.cell as? NSButtonCell {
+        buttonCell.highlightsBy = []
+        buttonCell.showsStateBy = []
+      }
       button.addSubview(imageView)
+      button.target = self
+      button.action = #selector(showStatusMenu(_:))
       button.setAccessibilityLabel("Threshold")
+      clearStatusItemHighlight(button)
 
       NSLayoutConstraint.activate([
         imageView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
@@ -193,8 +214,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     quitItem.target = self
     menu.addItem(quitItem)
 
-    item.menu = menu
+    menu.delegate = self
+    // IMPORTANT: Do not assign this menu to `item.menu`. AppKit owns the
+    // standard status-item highlight while an attached menu is tracking and
+    // can restore its dark backing after our transparent button is configured.
+    // Presenting the retained menu ourselves keeps that system highlight path
+    // detached without changing the menu's behavior.
+    statusMenu = menu
     statusItem = item
+  }
+
+  @objc private func showStatusMenu(_ sender: NSStatusBarButton) {
+    guard let statusMenu else { return }
+
+    clearStatusItemHighlight(sender)
+    statusMenu.popUp(positioning: nil, at: .zero, in: sender)
+    clearStatusItemHighlight(sender)
+  }
+
+  func menuWillOpen(_ menu: NSMenu) {
+    clearStatusItemHighlight()
+  }
+
+  func menuDidClose(_ menu: NSMenu) {
+    clearStatusItemHighlight()
+  }
+
+  private func clearStatusItemHighlight(_ button: NSStatusBarButton? = nil) {
+    guard let button = button ?? statusItem?.button else { return }
+    button.state = .off
+    button.highlight(false)
+    button.needsDisplay = true
   }
 
   @objc private func lockNowFromMenu() {
@@ -316,6 +366,7 @@ enum WindowPresentation {
     window?.level = .normal
     window?.orderOut(nil)
     NSApp.setActivationPolicy(.accessory)
+    NSApp.hide(nil)
   }
 
   private static func enterWindowed(_ window: NSWindow) {

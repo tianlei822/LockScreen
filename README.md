@@ -40,19 +40,26 @@ open .build/Threshold.app
 # 后台潜伏（状态栏锁形图标），随时按 ⌘L 召唤锁屏仪式。
 open .build/Threshold.app --args --background
 
+# Keep the workspace build ready at login without installing an app copy.
+# 不复制安装应用，直接让工作区构建在登录后常驻并响应快捷键。
+sh Scripts/install-login-agent.sh --workspace
+
 # Start the background lurker automatically at login (remove with --uninstall).
 # 登录时自动启动后台潜伏；应用会安装到 ~/Applications/Threshold.app（用 --uninstall 移除启动项）。
 sh Scripts/install-login-agent.sh
 ```
 
 `⌘L` is registered by Threshold's status-bar-only background process. A macOS App Shortcut cannot
-launch a terminated app, so run the installer above once: launchd keeps the receiver alive and
-restarts it if it exits. The main window and Dock icon do not need to be open. Carbon registers only
-this exact key combination, so Threshold does not request Accessibility or Input Monitoring access.
+launch a terminated app, so either keep the app open with `open ... --background`, or configure one
+of the LaunchAgent modes above: `--workspace` runs `.build/Threshold.app` in place without installing
+a copy, while the default mode copies it to `~/Applications`. The main window and Dock icon do not
+need to be open. Carbon registers only this exact key combination, so Threshold does not request
+Accessibility or Input Monitoring access.
 `⌘L` 由 Threshold 仅驻留状态栏的后台进程注册。macOS“App 快捷键”无法启动已退出的应用，
-因此请至少执行一次上面的安装脚本：launchd 会让接收进程保持运行，并在退出后自动重启；
-主窗口和 Dock 图标都不需要打开。Carbon 只注册这一组按键，因此 Threshold 不会申请“辅助功能”
-或“输入监控”权限。
+因此可使用 `open ... --background` 保持进程运行，或配置上述任一 LaunchAgent：`--workspace`
+直接运行 `.build/Threshold.app` 而不复制安装，默认模式则复制到 `~/Applications`。launchd 会让
+接收进程保持运行并在退出后自动重启；主窗口和 Dock 图标都不需要打开。Carbon 只注册这一组
+按键，因此 Threshold 不会申请“辅助功能”或“输入监控”权限。
 
 Local builds default to the login-keychain identity `Jarvis Codex Local Development` (SHA-1
 `B4035AE98DA51B2F173CF52BAACC758E5B35DF63`), matching the Jarvis packaging setup on this Mac.
@@ -82,6 +89,7 @@ TCC 权限连续性。可通过 `APPLE_SIGNING_IDENTITY` 指定其他证书；�
 
 ```sh
 swift format lint --recursive Sources Tests
+sh Scripts/check-status-item-appearance.sh
 swift test
 swift build -c release
 plutil -lint Support/Info.plist
