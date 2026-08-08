@@ -1,27 +1,31 @@
 import SwiftUI
 
 /// Full-door anime-style phenomena synchronized with the currently active phase.
-struct FivePhaseAnimeBackdrop: View {
+struct FivePhaseAnimeBackdrop: View, Equatable {
   let time: TimeInterval
   let energy: Double
   let isActivated: Bool
+
+  nonisolated private static let frameRate = 12.0
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    floor(lhs.time * frameRate) == floor(rhs.time * frameRate)
+      && lhs.energy == rhs.energy
+      && lhs.isActivated == rhs.isActivated
+  }
 
   var body: some View {
     let cycle = FivePhaseCycleState(time: time)
 
     GeometryReader { proxy in
-      ZStack {
-        ForEach(FivePhaseElement.allCases) { element in
-          ElementalAnimeScene(
-            element: element,
-            size: proxy.size,
-            time: time,
-            energy: energy,
-            isActivated: isActivated
-          )
-          .opacity(cycle.opacity(for: element))
-        }
-      }
+      ElementalAnimeScene(
+        element: cycle.current,
+        size: proxy.size,
+        time: time,
+        energy: energy,
+        isActivated: isActivated
+      )
+      .opacity(cycle.stageOpacity)
       .frame(width: proxy.size.width, height: proxy.size.height)
       .clipped()
       .allowsHitTesting(false)
@@ -52,7 +56,7 @@ private struct ElementalAnimeScene: View {
         endRadius: max(size.width, size.height) * 0.7
       )
 
-      Canvas { context, canvasSize in
+      Canvas(rendersAsynchronously: true) { context, canvasSize in
         switch element {
         case .wood:
           drawWood(in: &context, size: canvasSize, power: power)
@@ -85,6 +89,175 @@ private struct ElementalAnimeScene: View {
     size: CGSize,
     power: Double
   ) {
+    for treeIndex in 0..<14 {
+      let seed = Double(treeIndex + 1)
+      let base = CGPoint(
+        x: size.width * (0.025 + CGFloat(treeIndex) / 13 * 0.95)
+          + sin(time * 0.045 + seed) * size.width * 0.008,
+        y: size.height * (0.78 + CGFloat(treeIndex % 4) * 0.055)
+      )
+      let treeHeight = size.height * (0.16 + CGFloat(treeIndex % 5) * 0.028)
+      let crownCenter = CGPoint(
+        x: base.x + sin(time * 0.17 + seed * 0.7) * treeHeight * 0.025,
+        y: base.y - treeHeight
+      )
+      let trunkWidth = size.width * (0.005 + CGFloat(treeIndex % 3) * 0.002)
+      var trunk = Path()
+      trunk.move(to: CGPoint(x: base.x - trunkWidth, y: base.y))
+      trunk.addCurve(
+        to: CGPoint(x: crownCenter.x - trunkWidth * 0.28, y: crownCenter.y + treeHeight * 0.2),
+        control1: CGPoint(x: base.x - trunkWidth * 0.7, y: base.y - treeHeight * 0.38),
+        control2: CGPoint(x: crownCenter.x - trunkWidth * 0.8, y: crownCenter.y + treeHeight * 0.42)
+      )
+      trunk.addLine(
+        to: CGPoint(x: crownCenter.x + trunkWidth * 0.28, y: crownCenter.y + treeHeight * 0.2)
+      )
+      trunk.addCurve(
+        to: CGPoint(x: base.x + trunkWidth, y: base.y),
+        control1: CGPoint(
+          x: crownCenter.x + trunkWidth * 0.8, y: crownCenter.y + treeHeight * 0.42),
+        control2: CGPoint(x: base.x + trunkWidth * 0.7, y: base.y - treeHeight * 0.38)
+      )
+      trunk.closeSubpath()
+      context.fill(
+        trunk,
+        with: .linearGradient(
+          Gradient(colors: [
+            Color(red: 0.3, green: 0.14, blue: 0.045).opacity(0.24 * power),
+            Color(red: 0.06, green: 0.12, blue: 0.045).opacity(0.45 * power),
+          ]),
+          startPoint: CGPoint(x: base.x - trunkWidth, y: base.y),
+          endPoint: crownCenter
+        )
+      )
+
+      var branches = Path()
+      for branch in 0..<5 {
+        let branchY = base.y - treeHeight * (0.34 + CGFloat(branch) * 0.11)
+        let direction: CGFloat = branch.isMultiple(of: 2) ? -1 : 1
+        branches.move(to: CGPoint(x: base.x, y: branchY))
+        branches.addCurve(
+          to: CGPoint(
+            x: crownCenter.x + direction * treeHeight * (0.12 + CGFloat(branch % 3) * 0.035),
+            y: branchY - treeHeight * (0.13 + CGFloat(branch % 2) * 0.04)
+          ),
+          control1: CGPoint(
+            x: base.x + direction * treeHeight * 0.04, y: branchY - treeHeight * 0.04),
+          control2: CGPoint(
+            x: crownCenter.x + direction * treeHeight * 0.08,
+            y: branchY - treeHeight * 0.1
+          )
+        )
+      }
+      context.stroke(
+        branches,
+        with: .color(Color(red: 0.18, green: 0.22, blue: 0.07).opacity(0.27 * power)),
+        style: StrokeStyle(lineWidth: 1.2 + CGFloat(treeIndex % 3) * 0.45, lineCap: .round)
+      )
+
+      for crown in 0..<6 {
+        let crownAngle = Double(crown) * 2 * .pi / 6 + seed
+        let crownRadius = treeHeight * (0.1 + CGFloat(crown % 3) * 0.018)
+        let clusterCenter = CGPoint(
+          x: crownCenter.x + cos(crownAngle) * treeHeight * 0.105,
+          y: crownCenter.y + sin(crownAngle) * treeHeight * 0.07
+        )
+        var canopyGlow = context
+        canopyGlow.addFilter(.blur(radius: 8 + CGFloat(treeIndex % 4) * 2))
+        canopyGlow.fill(
+          Path(
+            ellipseIn: CGRect(
+              x: clusterCenter.x - crownRadius,
+              y: clusterCenter.y - crownRadius * 0.72,
+              width: crownRadius * 2,
+              height: crownRadius * 1.44
+            )
+          ),
+          with: .color(
+            Color(red: 0.08, green: 0.38, blue: 0.085)
+              .opacity((0.08 + Double(crown % 3) * 0.018) * power)
+          )
+        )
+      }
+    }
+
+    for layer in 0..<3 {
+      let baseline = size.height * (0.62 + CGFloat(layer) * 0.1)
+      let parallax =
+        sin(time * (0.055 + Double(layer) * 0.025) + Double(layer) * 1.8)
+        * size.width * (0.008 + CGFloat(layer) * 0.004)
+      var forest = Path()
+      forest.move(to: CGPoint(x: 0, y: size.height))
+      forest.addLine(to: CGPoint(x: -size.width * 0.04, y: baseline))
+
+      for tree in 0...22 {
+        let fraction = CGFloat(tree) / 22
+        let x = size.width * fraction + parallax
+        let hash = abs(sin(Double(tree * 13 + layer * 19) * 0.71))
+        let height = size.height * CGFloat(0.08 + hash * (0.13 - Double(layer) * 0.018))
+        let crown = size.width * (0.012 + CGFloat(tree % 3) * 0.004)
+        forest.addLine(to: CGPoint(x: x - crown, y: baseline))
+        forest.addLine(to: CGPoint(x: x - crown * 0.36, y: baseline - height * 0.42))
+        forest.addLine(to: CGPoint(x: x - crown * 0.72, y: baseline - height * 0.4))
+        forest.addLine(to: CGPoint(x: x, y: baseline - height))
+        forest.addLine(to: CGPoint(x: x + crown * 0.72, y: baseline - height * 0.4))
+        forest.addLine(to: CGPoint(x: x + crown * 0.36, y: baseline - height * 0.42))
+        forest.addLine(to: CGPoint(x: x + crown, y: baseline))
+      }
+
+      forest.addLine(to: CGPoint(x: size.width, y: size.height))
+      forest.closeSubpath()
+      var forestLayer = context
+      forestLayer.addFilter(.blur(radius: 10 + CGFloat(2 - layer) * 6))
+      forestLayer.fill(
+        forest,
+        with: .linearGradient(
+          Gradient(colors: [
+            Color(red: 0.11, green: 0.35, blue: 0.08).opacity(
+              (0.08 + Double(2 - layer) * 0.025) * power),
+            Color(red: 0.025, green: 0.09, blue: 0.035).opacity(
+              0.22 + Double(layer) * 0.055),
+          ]),
+          startPoint: CGPoint(x: size.width / 2, y: baseline - size.height * 0.18),
+          endPoint: CGPoint(x: size.width / 2, y: size.height)
+        )
+      )
+    }
+
+    for bladeIndex in 0..<120 {
+      let seed = Double(bladeIndex + 1)
+      let x = size.width * CGFloat(bladeIndex) / 119
+      let baseline = size.height * (0.79 + CGFloat(bladeIndex % 7) * 0.036)
+      let bladeHeight = size.height * (0.025 + CGFloat(bladeIndex % 6) * 0.008)
+      let sway = sin(time * (0.8 + seed.truncatingRemainder(dividingBy: 5) * 0.07) + seed)
+      var grass = Path()
+      grass.move(to: CGPoint(x: x, y: baseline))
+      grass.addCurve(
+        to: CGPoint(x: x + sway * bladeHeight * 0.32, y: baseline - bladeHeight),
+        control1: CGPoint(x: x, y: baseline - bladeHeight * 0.36),
+        control2: CGPoint(
+          x: x + sway * bladeHeight * 0.2,
+          y: baseline - bladeHeight * 0.72
+        )
+      )
+      context.stroke(
+        grass,
+        with: .linearGradient(
+          Gradient(colors: [
+            Color(red: 0.05, green: 0.19, blue: 0.05).opacity(0.22 * power),
+            Color(red: 0.38, green: 0.82, blue: 0.2).opacity(
+              (0.2 + Double(bladeIndex % 4) * 0.035) * power),
+          ]),
+          startPoint: CGPoint(x: x, y: baseline),
+          endPoint: CGPoint(x: x, y: baseline - bladeHeight)
+        ),
+        style: StrokeStyle(
+          lineWidth: 0.55 + CGFloat(bladeIndex % 3) * 0.28,
+          lineCap: .round
+        )
+      )
+    }
+
     for index in 0..<11 {
       let fraction = CGFloat(index) / 10
       let start = CGPoint(x: size.width * (0.12 + fraction * 0.76), y: size.height * 1.04)
@@ -113,7 +286,26 @@ private struct ElementalAnimeScene: View {
       )
       context.stroke(
         vine,
-        with: .color(element.color.opacity((0.16 + Double(index % 3) * 0.05) * power)),
+        with: .linearGradient(
+          Gradient(colors: [
+            Color(red: 0.12, green: 0.045, blue: 0.014).opacity(0.86 * power),
+            Color(red: 0.28, green: 0.14, blue: 0.045).opacity(0.74 * power),
+            Color(red: 0.075, green: 0.26, blue: 0.065).opacity(0.72 * power),
+          ]),
+          startPoint: start,
+          endPoint: CGPoint(x: crownX, y: crownY)
+        ),
+        style: StrokeStyle(
+          lineWidth: 2.8 + CGFloat(index.isMultiple(of: 3) ? 2.4 : 1.1),
+          lineCap: .round
+        )
+      )
+      context.stroke(
+        vine,
+        with: .color(
+          Color(red: 0.42, green: 0.9, blue: 0.26)
+            .opacity((0.2 + Double(index % 3) * 0.05) * power)
+        ),
         style: StrokeStyle(
           lineWidth: 0.7 + CGFloat(index.isMultiple(of: 3) ? 1.4 : 0.45),
           lineCap: .round
@@ -147,7 +339,11 @@ private struct ElementalAnimeScene: View {
         context.fill(
           leaf,
           with: .linearGradient(
-            Gradient(colors: [Color.white.opacity(0.55), element.color, Color.green.opacity(0.28)]),
+            Gradient(colors: [
+              Color(red: 0.72, green: 0.96, blue: 0.42).opacity(0.78),
+              Color(red: 0.17, green: 0.62, blue: 0.19),
+              Color(red: 0.025, green: 0.19, blue: 0.065),
+            ]),
             startPoint: CGPoint(x: x, y: y - leafLength / 2),
             endPoint: CGPoint(x: x, y: y + leafLength / 2)
           )
@@ -166,6 +362,21 @@ private struct ElementalAnimeScene: View {
           with: .color(Color.white.opacity(0.24 * power)),
           lineWidth: 0.42
         )
+
+        let curlRadius = leafLength * (0.48 + CGFloat(node % 2) * 0.16)
+        var curl = Path()
+        curl.addArc(
+          center: CGPoint(x: x, y: y),
+          radius: curlRadius,
+          startAngle: .radians(Double(index + node) * 0.72 + time * 0.2),
+          endAngle: .radians(Double(index + node) * 0.72 + time * 0.2 + 4.2),
+          clockwise: false
+        )
+        context.stroke(
+          curl,
+          with: .color(Color(red: 0.43, green: 0.84, blue: 0.2).opacity(0.34 * power)),
+          style: StrokeStyle(lineWidth: 0.7, lineCap: .round)
+        )
       }
     }
   }
@@ -177,6 +388,113 @@ private struct ElementalAnimeScene: View {
   ) {
     let sealCenter = CGPoint(x: size.width * 0.5, y: size.height * 0.53)
     let sealRadius = min(size.width, size.height) * 0.3
+    let fierceSunCenter = CGPoint(
+      x: size.width * 0.79 + sin(time * 0.055) * size.width * 0.012,
+      y: size.height * 0.2 + cos(time * 0.07) * size.height * 0.009
+    )
+    let fierceSunPulse = 0.88 + CGFloat(0.5 + 0.5 * sin(time * 1.7)) * 0.12
+    let fierceSunRadius = min(size.width, size.height) * 0.105 * fierceSunPulse
+
+    var fierceAura = context
+    fierceAura.addFilter(.blur(radius: 34))
+    fierceAura.fill(
+      Path(
+        ellipseIn: CGRect(
+          x: fierceSunCenter.x - fierceSunRadius * 2.9,
+          y: fierceSunCenter.y - fierceSunRadius * 2.9,
+          width: fierceSunRadius * 5.8,
+          height: fierceSunRadius * 5.8
+        )
+      ),
+      with: .radialGradient(
+        Gradient(colors: [
+          Color.white.opacity(0.22 * power),
+          Color.yellow.opacity(0.25 * power),
+          Color.orange.opacity(0.13 * power),
+          Color.red.opacity(0.045 * power),
+          .clear,
+        ]),
+        center: fierceSunCenter,
+        startRadius: 0,
+        endRadius: fierceSunRadius * 2.9
+      )
+    )
+
+    for rayIndex in 0..<44 {
+      let angle = Double(rayIndex) * 2 * .pi / 44 + time * 0.025
+      let rayPulse = 0.5 + 0.5 * sin(time * (1.25 + Double(rayIndex % 5) * 0.06) + Double(rayIndex))
+      let innerRadius = fierceSunRadius * 1.02
+      let outerRadius = fierceSunRadius * CGFloat(1.3 + rayPulse * 0.66)
+      var ray = Path()
+      ray.move(
+        to: CGPoint(
+          x: fierceSunCenter.x + cos(angle) * innerRadius,
+          y: fierceSunCenter.y + sin(angle) * innerRadius
+        )
+      )
+      ray.addLine(
+        to: CGPoint(
+          x: fierceSunCenter.x + cos(angle) * outerRadius,
+          y: fierceSunCenter.y + sin(angle) * outerRadius
+        )
+      )
+      context.stroke(
+        ray,
+        with: .color(
+          (rayIndex.isMultiple(of: 4) ? Color.yellow : Color.orange)
+            .opacity((0.12 + rayPulse * 0.22) * power)
+        ),
+        style: StrokeStyle(
+          lineWidth: 0.6 + CGFloat(rayIndex % 4) * 0.42,
+          lineCap: .round
+        )
+      )
+    }
+
+    context.fill(
+      Path(
+        ellipseIn: CGRect(
+          x: fierceSunCenter.x - fierceSunRadius,
+          y: fierceSunCenter.y - fierceSunRadius,
+          width: fierceSunRadius * 2,
+          height: fierceSunRadius * 2
+        )
+      ),
+      with: .radialGradient(
+        Gradient(colors: [
+          Color.white.opacity(0.72 * power),
+          Color.yellow.opacity(0.66 * power),
+          Color.orange.opacity(0.44 * power),
+          Color.red.opacity(0.17 * power),
+        ]),
+        center: CGPoint(
+          x: fierceSunCenter.x - fierceSunRadius * 0.24,
+          y: fierceSunCenter.y - fierceSunRadius * 0.26
+        ),
+        startRadius: 0,
+        endRadius: fierceSunRadius
+      )
+    )
+
+    for coronaIndex in 0..<7 {
+      let start = Double(coronaIndex) * 0.91 + time * (coronaIndex.isMultiple(of: 2) ? 0.08 : -0.06)
+      var corona = Path()
+      corona.addArc(
+        center: fierceSunCenter,
+        radius: fierceSunRadius * (1.06 + CGFloat(coronaIndex % 3) * 0.1),
+        startAngle: .radians(start),
+        endAngle: .radians(start + 0.42 + Double(coronaIndex % 3) * 0.12),
+        clockwise: false
+      )
+      context.stroke(
+        corona,
+        with: .color(Color.yellow.opacity((0.22 + Double(coronaIndex % 3) * 0.06) * power)),
+        style: StrokeStyle(
+          lineWidth: 1 + CGFloat(coronaIndex % 3) * 0.65,
+          lineCap: .round
+        )
+      )
+    }
 
     for ring in 0..<3 {
       let radius = sealRadius * (0.74 + CGFloat(ring) * 0.13)
@@ -417,6 +735,41 @@ private struct ElementalAnimeScene: View {
       )
     }
 
+    for index in 0..<14 {
+      let onLeft = index.isMultiple(of: 2)
+      let row = index / 2
+      let base = CGPoint(
+        x: size.width * (onLeft ? 0.025 : 0.975),
+        y: size.height * (0.28 + CGFloat(row) * 0.105)
+      )
+      let height = size.height * (0.16 + CGFloat(index % 4) * 0.028)
+      let flame = fireBackdropFlamePath(
+        base: base,
+        width: size.width * (0.075 + CGFloat(index % 3) * 0.014),
+        height: height,
+        phase: time * (1.05 + Double(index % 5) * 0.09) + Double(index) * 0.67
+      )
+      var edgeGlow = context
+      edgeGlow.addFilter(.blur(radius: 18 + CGFloat(index % 3) * 4))
+      edgeGlow.fill(
+        flame,
+        with: .color(Color.orange.opacity((0.055 + Double(index % 3) * 0.018) * power))
+      )
+      context.fill(
+        flame,
+        with: .linearGradient(
+          Gradient(colors: [
+            Color.yellow.opacity(0.16 * power),
+            Color.orange.opacity(0.2 * power),
+            Color.red.opacity(0.08 * power),
+            .clear,
+          ]),
+          startPoint: CGPoint(x: base.x, y: base.y - height),
+          endPoint: base
+        )
+      )
+    }
+
     for index in 0..<34 {
       let seed = Double(index + 1)
       let x = size.width * CGFloat(abs(sin(seed * 18.31)).truncatingRemainder(dividingBy: 1))
@@ -439,6 +792,244 @@ private struct ElementalAnimeScene: View {
     let epicenter = CGPoint(x: size.width / 2, y: size.height * 0.7)
     let sealCenter = CGPoint(x: size.width / 2, y: size.height * 0.54)
     let sealRadius = min(size.width, size.height) * 0.31
+
+    for orbit in 0..<3 {
+      let orbitRect = CGRect(
+        x: sealCenter.x - sealRadius * (1.25 + CGFloat(orbit) * 0.38),
+        y: sealCenter.y - sealRadius * (0.58 + CGFloat(orbit) * 0.18),
+        width: sealRadius * (2.5 + CGFloat(orbit) * 0.76),
+        height: sealRadius * (1.16 + CGFloat(orbit) * 0.36)
+      )
+      context.stroke(
+        Path(ellipseIn: orbitRect),
+        with: .color(
+          element.color.opacity((0.045 + Double(orbit) * 0.018) * power)
+        ),
+        style: StrokeStyle(
+          lineWidth: 0.55 + CGFloat(orbit) * 0.28,
+          dash: orbit == 1 ? [8, 7, 2, 7] : []
+        )
+      )
+    }
+
+    for planet in 0..<7 {
+      let direction = planet.isMultiple(of: 2) ? 1.0 : -1.0
+      let angle = Double(planet) * 2 * .pi / 7 + time * (0.035 + Double(planet) * 0.006) * direction
+      let orbitX = sealRadius * (1.32 + CGFloat(planet % 3) * 0.34)
+      let orbitY = sealRadius * (0.64 + CGFloat(planet % 3) * 0.16)
+      let planetCenter = CGPoint(
+        x: sealCenter.x + cos(angle) * orbitX,
+        y: sealCenter.y + sin(angle) * orbitY
+      )
+      let planetRadius = CGFloat(3.8 + Double(planet % 4) * 2)
+      let planetRect = CGRect(
+        x: planetCenter.x - planetRadius,
+        y: planetCenter.y - planetRadius,
+        width: planetRadius * 2,
+        height: planetRadius * 2
+      )
+      if planet.isMultiple(of: 3) {
+        context.stroke(
+          Path(
+            ellipseIn: planetRect.insetBy(
+              dx: -planetRadius * 0.72,
+              dy: planetRadius * 0.5
+            )
+          ),
+          with: .color(Color(red: 0.92, green: 0.66, blue: 0.36).opacity(0.3 * power)),
+          lineWidth: 0.65
+        )
+      }
+      context.fill(
+        Path(ellipseIn: planetRect),
+        with: .radialGradient(
+          Gradient(colors: [
+            Color(red: 0.96, green: 0.72, blue: 0.42).opacity(0.74 * power),
+            element.color.opacity(0.62 * power),
+            Color(red: 0.12, green: 0.045, blue: 0.015).opacity(0.86),
+          ]),
+          center: CGPoint(
+            x: planetCenter.x - planetRadius * 0.28,
+            y: planetCenter.y - planetRadius * 0.32
+          ),
+          startRadius: 0,
+          endRadius: planetRadius
+        )
+      )
+    }
+
+    let saturnCenter = CGPoint(
+      x: size.width * 0.82 + sin(time * 0.075) * size.width * 0.012,
+      y: size.height * 0.22 + cos(time * 0.09) * size.height * 0.009
+    )
+    let saturnRadius = sealRadius * 0.115
+    let saturnRect = CGRect(
+      x: saturnCenter.x - saturnRadius,
+      y: saturnCenter.y - saturnRadius,
+      width: saturnRadius * 2,
+      height: saturnRadius * 2
+    )
+    var saturnAura = context
+    saturnAura.addFilter(.blur(radius: 16))
+    saturnAura.fill(
+      Path(ellipseIn: saturnRect.insetBy(dx: -saturnRadius, dy: -saturnRadius)),
+      with: .color(Color.orange.opacity(0.055 * power))
+    )
+    context.stroke(
+      Path(
+        ellipseIn: CGRect(
+          x: saturnCenter.x - saturnRadius * 2.25,
+          y: saturnCenter.y - saturnRadius * 0.48,
+          width: saturnRadius * 4.5,
+          height: saturnRadius * 0.96
+        )
+      ),
+      with: .linearGradient(
+        Gradient(colors: [
+          .clear,
+          Color(red: 0.95, green: 0.73, blue: 0.45).opacity(0.42 * power),
+          element.color.opacity(0.26 * power),
+          .clear,
+        ]),
+        startPoint: CGPoint(x: saturnCenter.x - saturnRadius * 2.2, y: saturnCenter.y),
+        endPoint: CGPoint(x: saturnCenter.x + saturnRadius * 2.2, y: saturnCenter.y)
+      ),
+      style: StrokeStyle(lineWidth: saturnRadius * 0.2, lineCap: .round)
+    )
+    context.fill(
+      Path(ellipseIn: saturnRect),
+      with: .radialGradient(
+        Gradient(colors: [
+          Color(red: 0.98, green: 0.76, blue: 0.46).opacity(0.78 * power),
+          Color(red: 0.55, green: 0.28, blue: 0.09).opacity(0.7 * power),
+          Color(red: 0.12, green: 0.045, blue: 0.015).opacity(0.9),
+        ]),
+        center: CGPoint(
+          x: saturnCenter.x - saturnRadius * 0.3,
+          y: saturnCenter.y - saturnRadius * 0.32
+        ),
+        startRadius: 0,
+        endRadius: saturnRadius
+      )
+    )
+
+    let brokenCenter = CGPoint(
+      x: size.width * 0.16 + cos(time * 0.065) * size.width * 0.01,
+      y: size.height * 0.28 + sin(time * 0.085) * size.height * 0.008
+    )
+    let brokenRadius = sealRadius * 0.13
+    context.fill(
+      Path(
+        ellipseIn: CGRect(
+          x: brokenCenter.x - brokenRadius,
+          y: brokenCenter.y - brokenRadius,
+          width: brokenRadius * 2,
+          height: brokenRadius * 2
+        )
+      ),
+      with: .radialGradient(
+        Gradient(colors: [
+          Color(red: 0.84, green: 0.54, blue: 0.27).opacity(0.58 * power),
+          Color(red: 0.28, green: 0.12, blue: 0.04).opacity(0.78 * power),
+          Color.black.opacity(0.84),
+        ]),
+        center: CGPoint(
+          x: brokenCenter.x - brokenRadius * 0.25,
+          y: brokenCenter.y - brokenRadius * 0.3
+        ),
+        startRadius: 0,
+        endRadius: brokenRadius
+      )
+    )
+    for crackIndex in 0..<7 {
+      let angle = Double(crackIndex) * 2 * .pi / 7 + 0.34
+      var planetCrack = Path()
+      planetCrack.move(to: brokenCenter)
+      planetCrack.addLine(
+        to: CGPoint(
+          x: brokenCenter.x + cos(angle) * brokenRadius * 0.45,
+          y: brokenCenter.y + sin(angle) * brokenRadius * 0.45
+        )
+      )
+      planetCrack.addLine(
+        to: CGPoint(
+          x: brokenCenter.x + cos(angle + 0.15) * brokenRadius * 0.94,
+          y: brokenCenter.y + sin(angle + 0.15) * brokenRadius * 0.94
+        )
+      )
+      context.stroke(
+        planetCrack,
+        with: .color(Color.orange.opacity((0.22 + Double(crackIndex % 3) * 0.06) * power)),
+        lineWidth: 0.65 + CGFloat(crackIndex % 2) * 0.55
+      )
+    }
+    for fragment in 0..<9 {
+      let angle = Double(fragment) * 2 * .pi / 9 - time * 0.08
+      let distance = brokenRadius * (1.35 + CGFloat(fragment % 3) * 0.34)
+      let fragmentCenter = CGPoint(
+        x: brokenCenter.x + cos(angle) * distance,
+        y: brokenCenter.y + sin(angle) * distance * 0.68
+      )
+      let fragmentSize = brokenRadius * (0.13 + CGFloat(fragment % 3) * 0.045)
+      var shard = Path()
+      shard.move(to: CGPoint(x: fragmentCenter.x, y: fragmentCenter.y - fragmentSize))
+      shard.addLine(
+        to: CGPoint(x: fragmentCenter.x + fragmentSize * 0.72, y: fragmentCenter.y)
+      )
+      shard.addLine(
+        to: CGPoint(x: fragmentCenter.x - fragmentSize * 0.42, y: fragmentCenter.y + fragmentSize)
+      )
+      shard.closeSubpath()
+      context.fill(
+        shard,
+        with: .color(
+          Color(red: 0.68, green: 0.38, blue: 0.17)
+            .opacity((0.25 + Double(fragment % 3) * 0.06) * power)
+        )
+      )
+    }
+
+    for comet in 0..<5 {
+      let seed = Double(comet + 1)
+      let progress =
+        (time * (0.028 + seed * 0.003) + seed * 0.19)
+        .truncatingRemainder(dividingBy: 1.35) - 0.18
+      let head = CGPoint(
+        x: size.width * CGFloat(progress),
+        y: size.height * CGFloat(0.08 + seed * 0.065 + progress * 0.24)
+      )
+      let tail = CGPoint(
+        x: head.x - size.width * (0.1 + CGFloat(comet % 3) * 0.035),
+        y: head.y - size.height * (0.055 + CGFloat(comet % 2) * 0.025)
+      )
+      var cometTrail = Path()
+      cometTrail.move(to: tail)
+      cometTrail.addLine(to: head)
+      var cometGlow = context
+      cometGlow.addFilter(.blur(radius: 7))
+      cometGlow.stroke(
+        cometTrail,
+        with: .color(Color.orange.opacity(0.13 * power)),
+        style: StrokeStyle(lineWidth: 7 + CGFloat(comet % 3) * 2, lineCap: .round)
+      )
+      context.stroke(
+        cometTrail,
+        with: .linearGradient(
+          Gradient(colors: [
+            .clear,
+            element.color.opacity(0.28 * power),
+            Color.white.opacity(0.62 * power),
+          ]),
+          startPoint: tail,
+          endPoint: head
+        ),
+        style: StrokeStyle(lineWidth: 0.75 + CGFloat(comet % 3) * 0.4, lineCap: .round)
+      )
+      context.fill(
+        Path(ellipseIn: CGRect(x: head.x - 2.4, y: head.y - 2.4, width: 4.8, height: 4.8)),
+        with: .color(Color.white.opacity(0.72 * power))
+      )
+    }
 
     for ridge in 0..<4 {
       let horizontalShift =
@@ -711,6 +1302,152 @@ private struct ElementalAnimeScene: View {
       )
     )
 
+    for relicIndex in 0..<18 {
+      let relicKind = relicIndex % 6
+      let angle = Double(relicIndex) * 2 * .pi / 18 - time * 0.025
+      let orbitX = reach * (1.22 + CGFloat(relicIndex % 3) * 0.09)
+      let orbitY = reach * (0.88 + CGFloat(relicIndex % 4) * 0.055)
+      let relicCenter = CGPoint(
+        x: center.x + cos(angle) * orbitX,
+        y: center.y + sin(angle) * orbitY
+          + sin(time * (0.42 + Double(relicKind) * 0.04) + Double(relicIndex)) * 5
+      )
+      let relicScale = unit * (0.052 + CGFloat(relicIndex % 4) * 0.008)
+      let relicAngle =
+        relicKind < 2
+        ? angle + .pi / 2 + sin(time * 0.3 + Double(relicIndex)) * 0.09
+        : sin(time * 0.38 + Double(relicIndex)) * 0.12
+      let relic = bronzeRelicPath(
+        center: relicCenter,
+        scale: relicScale,
+        angle: relicAngle,
+        kind: relicKind
+      )
+      let relicFlash =
+        0.42 + 0.58
+        * (0.5 + 0.5 * sin(time * (1.25 + Double(relicKind) * 0.11) + Double(relicIndex)))
+      var relicGlow = context
+      relicGlow.addFilter(.blur(radius: 8 + CGFloat(relicIndex % 4) * 2))
+      relicGlow.stroke(
+        relic,
+        with: .color(
+          (relicKind >= 4 ? Color.orange : element.color)
+            .opacity((0.055 + relicFlash * 0.055) * power)
+        ),
+        style: StrokeStyle(lineWidth: 7 + CGFloat(relicIndex % 3) * 2, lineCap: .round)
+      )
+      context.stroke(
+        relic,
+        with: .linearGradient(
+          Gradient(colors: [
+            Color(red: 0.78, green: 0.48, blue: 0.2).opacity(
+              (0.24 + relicFlash * 0.2) * power),
+            Color.white.opacity((0.2 + relicFlash * 0.3) * power),
+            element.color.opacity((0.24 + relicFlash * 0.24) * power),
+          ]),
+          startPoint: CGPoint(x: relicCenter.x - relicScale, y: relicCenter.y - relicScale),
+          endPoint: CGPoint(x: relicCenter.x + relicScale, y: relicCenter.y + relicScale)
+        ),
+        style: StrokeStyle(
+          lineWidth: 0.7 + CGFloat(relicFlash) * 0.85,
+          lineCap: .round,
+          lineJoin: .round
+        )
+      )
+    }
+
+    for swordIndex in 0..<15 {
+      let fraction = CGFloat(swordIndex) / 14
+      let sideBias = abs(fraction - 0.5) * 2
+      let swordCenter = CGPoint(
+        x: size.width * (0.035 + fraction * 0.93),
+        y: size.height * (0.83 + CGFloat(swordIndex % 3) * 0.045)
+          + sin(time * 0.35 + Double(swordIndex)) * 3
+      )
+      let length = unit * (0.18 + sideBias * 0.11 + CGFloat(swordIndex % 3) * 0.025)
+      let angle = sin(Double(swordIndex) * 1.7) * 0.17
+      let plantedSword = spiritSwordPath(
+        center: swordCenter,
+        length: length,
+        width: length * 0.12,
+        angle: angle
+      )
+      var plantedGlow = context
+      plantedGlow.addFilter(.blur(radius: 9 + CGFloat(swordIndex % 4) * 2))
+      plantedGlow.fill(
+        plantedSword,
+        with: .color(element.color.opacity((0.035 + Double(swordIndex % 3) * 0.015) * power))
+      )
+      context.fill(
+        plantedSword,
+        with: .linearGradient(
+          Gradient(colors: [
+            Color.white.opacity(0.16 * power),
+            element.color.opacity(0.14 * power),
+            Color(red: 0.015, green: 0.08, blue: 0.055).opacity(0.52),
+          ]),
+          startPoint: CGPoint(x: swordCenter.x, y: swordCenter.y - length * 0.5),
+          endPoint: CGPoint(x: swordCenter.x, y: swordCenter.y + length * 0.5)
+        )
+      )
+      context.stroke(
+        spiritSwordDetailPath(
+          center: swordCenter,
+          length: length,
+          width: length * 0.12,
+          angle: angle
+        ),
+        with: .color(Color.white.opacity((0.08 + Double(swordIndex % 3) * 0.025) * power)),
+        lineWidth: 0.5
+      )
+    }
+
+    for shardIndex in 0..<22 {
+      let seed = Double(shardIndex + 1)
+      let progress =
+        (time * (0.035 + seed.truncatingRemainder(dividingBy: 5) * 0.006) + seed * 0.083)
+        .truncatingRemainder(dividingBy: 1.28) - 0.14
+      let head = CGPoint(
+        x: size.width * CGFloat(1.08 - progress),
+        y: size.height
+          * CGFloat(
+            0.06 + abs(sin(seed * 2.4)) * 0.62 + progress * 0.18
+          )
+      )
+      let tail = CGPoint(
+        x: head.x + size.width * (0.035 + CGFloat(shardIndex % 4) * 0.012),
+        y: head.y - size.height * (0.02 + CGFloat(shardIndex % 3) * 0.008)
+      )
+      var shardTrail = Path()
+      shardTrail.move(to: tail)
+      shardTrail.addLine(to: head)
+      context.stroke(
+        shardTrail,
+        with: .linearGradient(
+          Gradient(colors: [
+            .clear,
+            element.color.opacity(0.2 * power),
+            Color.white.opacity(0.48 * power),
+          ]),
+          startPoint: tail,
+          endPoint: head
+        ),
+        style: StrokeStyle(lineWidth: 0.55 + CGFloat(shardIndex % 3) * 0.35, lineCap: .round)
+      )
+
+      let shardSize = 2.2 + CGFloat(shardIndex % 4)
+      var shard = Path()
+      shard.move(to: CGPoint(x: head.x, y: head.y - shardSize))
+      shard.addLine(to: CGPoint(x: head.x + shardSize * 0.55, y: head.y))
+      shard.addLine(to: CGPoint(x: head.x, y: head.y + shardSize * 1.3))
+      shard.addLine(to: CGPoint(x: head.x - shardSize * 0.55, y: head.y))
+      shard.closeSubpath()
+      context.fill(
+        shard,
+        with: .color(Color.white.opacity((0.22 + Double(shardIndex % 4) * 0.05) * power))
+      )
+    }
+
     for index in 0..<10 {
       let angle = Double(index) * 2 * Double.pi / 10 + time * 0.04
       let orbit = reach * (0.84 + CGFloat(index % 3) * 0.07)
@@ -849,6 +1586,69 @@ private struct ElementalAnimeScene: View {
     size: CGSize,
     power: Double
   ) {
+    for oceanBand in 0..<5 {
+      let baseline = size.height * (0.5 + CGFloat(oceanBand) * 0.095)
+      let amplitude = size.height * (0.02 + CGFloat(oceanBand) * 0.006)
+      var crest = Path()
+      for pointIndex in 0...120 {
+        let fraction = CGFloat(pointIndex) / 120
+        let phase =
+          Double(fraction) * .pi * (2.15 + Double(oceanBand) * 0.33)
+          - time * (0.34 + Double(oceanBand) * 0.1)
+        let swell = sin(phase)
+        let detail = sin(phase * 2.7 + Double(oceanBand) * 0.8) * 0.24
+        let point = CGPoint(
+          x: size.width * fraction,
+          y: baseline + CGFloat(swell + detail) * amplitude
+        )
+        pointIndex == 0 ? crest.move(to: point) : crest.addLine(to: point)
+      }
+
+      var oceanBody = crest
+      oceanBody.addLine(to: CGPoint(x: size.width, y: size.height))
+      oceanBody.addLine(to: CGPoint(x: 0, y: size.height))
+      oceanBody.closeSubpath()
+      context.fill(
+        oceanBody,
+        with: .linearGradient(
+          Gradient(colors: [
+            Color(red: 0.14, green: 0.54, blue: 0.92).opacity(
+              (0.055 + Double(4 - oceanBand) * 0.012) * power),
+            element.color.opacity((0.075 + Double(oceanBand) * 0.018) * power),
+            Color(red: 0.008, green: 0.035, blue: 0.105).opacity(
+              0.28 + Double(oceanBand) * 0.035),
+          ]),
+          startPoint: CGPoint(x: size.width / 2, y: baseline - amplitude),
+          endPoint: CGPoint(x: size.width / 2, y: size.height)
+        )
+      )
+      var oceanGlow = context
+      oceanGlow.addFilter(.blur(radius: 6 + CGFloat(oceanBand) * 2))
+      oceanGlow.stroke(
+        crest,
+        with: .color(element.color.opacity((0.07 + Double(oceanBand) * 0.015) * power)),
+        style: StrokeStyle(lineWidth: 7 + CGFloat(oceanBand) * 2, lineCap: .round)
+      )
+      context.stroke(
+        crest,
+        with: .linearGradient(
+          Gradient(colors: [
+            .clear,
+            Color.white.opacity((0.22 + Double(oceanBand % 2) * 0.08) * power),
+            element.color.opacity(0.18 * power),
+            .clear,
+          ]),
+          startPoint: CGPoint(x: 0, y: baseline),
+          endPoint: CGPoint(x: size.width, y: baseline)
+        ),
+        style: StrokeStyle(
+          lineWidth: 0.75 + CGFloat(oceanBand % 3) * 0.48,
+          lineCap: .round,
+          lineJoin: .round
+        )
+      )
+    }
+
     for index in 0..<110 {
       let seed = Double(index + 1)
       let xHash = abs(sin(seed * 17.731) * 4_375.3).truncatingRemainder(dividingBy: 1)
@@ -920,6 +1720,47 @@ private struct ElementalAnimeScene: View {
 
     let tideCenter = CGPoint(x: size.width * 0.5, y: size.height * 0.55)
     let tideRadius = min(size.width, size.height) * 0.31
+
+    for current in 0..<6 {
+      let radiusX = tideRadius * (1.08 + CGFloat(current) * 0.18)
+      let radiusY = tideRadius * (0.52 + CGFloat(current) * 0.08)
+      let phase = time * (current.isMultiple(of: 2) ? 0.19 : -0.14) + Double(current) * 0.84
+      var currentPath = Path()
+      for point in 0...48 {
+        let progress = Double(point) / 48
+        let angle = phase + progress * (1.5 + Double(current % 3) * 0.24)
+        let currentPoint = CGPoint(
+          x: tideCenter.x + cos(angle) * radiusX,
+          y: tideCenter.y + sin(angle) * radiusY
+        )
+        point == 0 ? currentPath.move(to: currentPoint) : currentPath.addLine(to: currentPoint)
+      }
+      var currentGlow = context
+      currentGlow.addFilter(.blur(radius: 5 + CGFloat(current)))
+      currentGlow.stroke(
+        currentPath,
+        with: .color(element.color.opacity((0.08 + Double(current % 3) * 0.025) * power)),
+        style: StrokeStyle(lineWidth: 5 + CGFloat(current), lineCap: .round)
+      )
+      context.stroke(
+        currentPath,
+        with: .linearGradient(
+          Gradient(colors: [
+            .clear,
+            Color.white.opacity(0.34 * power),
+            element.color.opacity(0.32 * power),
+            .clear,
+          ]),
+          startPoint: CGPoint(x: tideCenter.x - radiusX, y: tideCenter.y),
+          endPoint: CGPoint(x: tideCenter.x + radiusX, y: tideCenter.y)
+        ),
+        style: StrokeStyle(
+          lineWidth: 0.8 + CGFloat(current % 3) * 0.45,
+          lineCap: .round
+        )
+      )
+    }
+
     let tideRect = CGRect(
       x: tideCenter.x - tideRadius,
       y: tideCenter.y - tideRadius,
@@ -1317,6 +2158,169 @@ private struct ElementalAnimeScene: View {
         path.addLine(
           to: rotatedPoint(x: reach, y: y - length * 0.07, around: center, angle: angle)
         )
+      }
+    }
+  }
+
+  private func bronzeRelicPath(
+    center: CGPoint,
+    scale: CGFloat,
+    angle: Double,
+    kind: Int
+  ) -> Path {
+    let point: (CGFloat, CGFloat) -> CGPoint = { x, y in
+      rotatedPoint(x: x * scale, y: y * scale, around: center, angle: angle)
+    }
+
+    return Path { path in
+      switch kind {
+      case 0:  // Long spear with a diamond blade and tassel.
+        path.move(to: point(0, 0.92))
+        path.addLine(to: point(0, -0.55))
+        path.move(to: point(0, -1.02))
+        path.addLine(to: point(0.18, -0.69))
+        path.addLine(to: point(0, -0.48))
+        path.addLine(to: point(-0.18, -0.69))
+        path.closeSubpath()
+        path.move(to: point(-0.05, -0.49))
+        path.addCurve(
+          to: point(-0.28, -0.17),
+          control1: point(-0.22, -0.39),
+          control2: point(-0.31, -0.29)
+        )
+        path.move(to: point(0.05, -0.49))
+        path.addCurve(
+          to: point(0.28, -0.17),
+          control1: point(0.22, -0.39),
+          control2: point(0.31, -0.29)
+        )
+
+      case 1:  // Crescent halberd.
+        path.move(to: point(0, 0.94))
+        path.addLine(to: point(0, -0.88))
+        path.move(to: point(0, -1.05))
+        path.addLine(to: point(0.13, -0.79))
+        path.addLine(to: point(0, -0.6))
+        path.addLine(to: point(-0.13, -0.79))
+        path.closeSubpath()
+        path.move(to: point(0.01, -0.63))
+        path.addCurve(
+          to: point(0.5, -0.31),
+          control1: point(0.35, -0.64),
+          control2: point(0.51, -0.53)
+        )
+        path.addCurve(
+          to: point(0.08, -0.39),
+          control1: point(0.34, -0.32),
+          control2: point(0.2, -0.34)
+        )
+
+      case 2:  // Layered shield with a raised boss.
+        let outline = [
+          point(0, -0.92), point(0.61, -0.58), point(0.54, 0.3),
+          point(0, 0.92), point(-0.54, 0.3), point(-0.61, -0.58),
+        ]
+        path.move(to: outline[0])
+        for outlinePoint in outline.dropFirst() { path.addLine(to: outlinePoint) }
+        path.closeSubpath()
+        path.move(to: point(0, -0.62))
+        path.addLine(to: point(0.35, -0.34))
+        path.addLine(to: point(0.27, 0.2))
+        path.addLine(to: point(0, 0.55))
+        path.addLine(to: point(-0.27, 0.2))
+        path.addLine(to: point(-0.35, -0.34))
+        path.closeSubpath()
+        path.move(to: point(-0.16, 0))
+        path.addLine(to: point(0.16, 0))
+        path.move(to: point(0, -0.16))
+        path.addLine(to: point(0, 0.16))
+
+      case 3:  // Ceremonial lamellar armor.
+        path.move(to: point(-0.26, -0.86))
+        path.addLine(to: point(-0.69, -0.55))
+        path.addLine(to: point(-0.49, -0.2))
+        path.addLine(to: point(-0.36, -0.31))
+        path.addLine(to: point(-0.31, 0.42))
+        path.addLine(to: point(-0.52, 0.86))
+        path.addLine(to: point(0, 0.7))
+        path.addLine(to: point(0.52, 0.86))
+        path.addLine(to: point(0.31, 0.42))
+        path.addLine(to: point(0.36, -0.31))
+        path.addLine(to: point(0.49, -0.2))
+        path.addLine(to: point(0.69, -0.55))
+        path.addLine(to: point(0.26, -0.86))
+        path.addCurve(
+          to: point(-0.26, -0.86),
+          control1: point(0.13, -0.64),
+          control2: point(-0.13, -0.64)
+        )
+        path.move(to: point(-0.31, -0.3))
+        path.addLine(to: point(0.31, -0.3))
+        path.move(to: point(-0.3, 0.02))
+        path.addLine(to: point(0.3, 0.02))
+        path.move(to: point(-0.3, 0.34))
+        path.addLine(to: point(0.3, 0.34))
+        path.move(to: point(0, -0.61))
+        path.addLine(to: point(0, 0.65))
+
+      case 4:  // Three-legged bronze ding with handles and a taotie motif.
+        path.move(to: point(-0.62, -0.45))
+        path.addLine(to: point(0.62, -0.45))
+        path.addLine(to: point(0.45, 0.35))
+        path.addCurve(
+          to: point(-0.45, 0.35),
+          control1: point(0.24, 0.58),
+          control2: point(-0.24, 0.58)
+        )
+        path.closeSubpath()
+        path.move(to: point(-0.42, -0.46))
+        path.addCurve(
+          to: point(-0.72, -0.25),
+          control1: point(-0.76, -0.65),
+          control2: point(-0.82, -0.35)
+        )
+        path.move(to: point(0.42, -0.46))
+        path.addCurve(
+          to: point(0.72, -0.25),
+          control1: point(0.76, -0.65),
+          control2: point(0.82, -0.35)
+        )
+        path.move(to: point(-0.28, 0.34))
+        path.addLine(to: point(-0.4, 0.91))
+        path.move(to: point(0, 0.41))
+        path.addLine(to: point(0, 0.96))
+        path.move(to: point(0.28, 0.34))
+        path.addLine(to: point(0.4, 0.91))
+        path.move(to: point(-0.32, -0.05))
+        path.addLine(to: point(-0.14, -0.19))
+        path.addLine(to: point(0, -0.04))
+        path.addLine(to: point(0.14, -0.19))
+        path.addLine(to: point(0.32, -0.05))
+        path.move(to: point(-0.24, 0.13))
+        path.addLine(to: point(0.24, 0.13))
+
+      default:  // Ritual bronze bell.
+        path.move(to: point(-0.18, -0.92))
+        path.addCurve(
+          to: point(0.18, -0.92),
+          control1: point(-0.17, -1.17),
+          control2: point(0.17, -1.17)
+        )
+        path.move(to: point(-0.18, -0.91))
+        path.addLine(to: point(-0.42, 0.58))
+        path.addLine(to: point(-0.61, 0.8))
+        path.addLine(to: point(0.61, 0.8))
+        path.addLine(to: point(0.42, 0.58))
+        path.addLine(to: point(0.18, -0.91))
+        path.closeSubpath()
+        path.move(to: point(-0.31, -0.35))
+        path.addLine(to: point(0.31, -0.35))
+        path.move(to: point(-0.38, 0.1))
+        path.addLine(to: point(0.38, 0.1))
+        path.move(to: point(-0.44, 0.52))
+        path.addLine(to: point(0.44, 0.52))
+        path.move(to: point(0, 0.8))
+        path.addLine(to: point(0, 1.02))
       }
     }
   }
