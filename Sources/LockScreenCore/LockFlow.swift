@@ -1,6 +1,6 @@
 public enum DoorTheme: String, CaseIterable, Identifiable, Sendable {
-  case wood
   case formation
+  case wood
   case vault
 
   public var id: Self { self }
@@ -119,7 +119,7 @@ public struct LockFlow: Equatable, Sendable {
     }
   }
 
-  public init(theme: DoorTheme = .wood, vaultPasscode: String = "1024") {
+  public init(theme: DoorTheme = .formation, vaultPasscode: String = "1024") {
     self.theme = theme
     self.vaultPasscode = vaultPasscode
     phase = .awaitingSequence
@@ -127,7 +127,7 @@ public struct LockFlow: Equatable, Sendable {
     lastMove = nil
     woodKnockCount = 0
     formationEnergy = 0
-    formationTrajectory = .circle
+    formationTrajectory = .infinity
   }
 
   @discardableResult

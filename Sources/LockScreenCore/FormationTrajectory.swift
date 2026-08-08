@@ -1,8 +1,8 @@
 import Foundation
 
 public enum FormationTrajectory: String, CaseIterable, Identifiable, Sendable {
-  case circle
   case infinity
+  case circle
   case triangle
 
   public var id: Self { self }
@@ -114,7 +114,8 @@ public enum FormationTrajectoryMatcher {
     let reverseDistance = bestCircularDistance(input, Array(target.reversed()))
     let distance = min(forwardDistance, reverseDistance)
 
-    return max(0, min(1, 1 - distance / 0.3))
+    let distanceTolerance = trajectory == .circle ? 0.36 : 0.3
+    return max(0, min(1, 1 - distance / distanceTolerance))
   }
 
   /// Live charge based on how much of the guide's total path length has been drawn.

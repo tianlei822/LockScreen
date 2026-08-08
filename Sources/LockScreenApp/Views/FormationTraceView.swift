@@ -145,7 +145,9 @@ private struct FormationTraceCanvas: View {
   @State private var liveCharge = 0.0
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
+    TimelineView(
+      .animation(minimumInterval: trajectory == .circle ? 1 / 24 : 1 / 20)
+    ) { timeline in
       GeometryReader { proxy in
         let size = proxy.size
         let time = timeline.date.timeIntervalSinceReferenceDate
@@ -266,9 +268,10 @@ private struct FormationTraceCanvas: View {
       Circle()
         .trim(from: 0, to: max(0.008, charge))
         .stroke(
-          AngularGradient(
+          LinearGradient(
             colors: [style.primary, style.secondary, style.flare, style.primary],
-            center: .center
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
           ),
           style: StrokeStyle(lineWidth: isChanneling ? 5 : 3, lineCap: .round)
         )

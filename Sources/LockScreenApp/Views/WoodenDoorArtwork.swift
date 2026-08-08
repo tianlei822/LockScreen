@@ -35,6 +35,8 @@ struct WoodenDoorArtwork: View {
           }
         }
 
+        growthRings(size: size)
+
         doorSeam(size: size)
 
         knockSeals(size: size)
@@ -148,6 +150,77 @@ struct WoodenDoorArtwork: View {
       }
     }
     .allowsHitTesting(false)
+  }
+
+  private func growthRings(size: CGSize) -> some View {
+    Canvas { context, _ in
+      let positions: [(CGPoint, CGFloat, CGFloat)] = [
+        (CGPoint(x: size.width * 0.11, y: size.height * 0.3), 0.82, -0.12),
+        (CGPoint(x: size.width * 0.39, y: size.height * 0.18), 1.05, 0.08),
+        (CGPoint(x: size.width * 0.65, y: size.height * 0.31), 0.9, -0.04),
+        (CGPoint(x: size.width * 0.88, y: size.height * 0.57), 1.08, 0.13),
+        (CGPoint(x: size.width * 0.2, y: size.height * 0.72), 0.94, 0.05),
+        (CGPoint(x: size.width * 0.61, y: size.height * 0.84), 1.18, -0.09),
+      ]
+
+      for (index, ringSet) in positions.enumerated() {
+        let (center, scale, lean) = ringSet
+        for ring in 0..<8 {
+          let width = CGFloat(22 + ring * 14) * scale
+          let height = width * (0.28 + CGFloat(index % 3) * 0.035)
+          let path = growthRingPath(
+            center: center,
+            width: width,
+            height: height,
+            phase: Double(index) * 0.91 + Double(ring) * 0.28,
+            lean: lean
+          )
+          context.stroke(
+            path,
+            with: .color(Color.black.opacity(0.16 - Double(ring) * 0.012)),
+            lineWidth: ring == 0 ? 1.7 : 0.75
+          )
+
+          if ring.isMultiple(of: 3) {
+            context.stroke(
+              path,
+              with: .color(Color.white.opacity(0.026)),
+              lineWidth: 0.35
+            )
+          }
+        }
+      }
+    }
+    .blendMode(.softLight)
+    .allowsHitTesting(false)
+  }
+
+  private func growthRingPath(
+    center: CGPoint,
+    width: CGFloat,
+    height: CGFloat,
+    phase: Double,
+    lean: CGFloat
+  ) -> Path {
+    var path = Path()
+
+    for step in 0...48 {
+      let angle = Double(step) / 48 * 2 * Double.pi
+      let wobble = 1 + sin(angle * 3 + phase) * 0.055 + cos(angle * 7 - phase) * 0.022
+      let yOffset = sin(angle) * height * 0.5 * wobble
+      let point = CGPoint(
+        x: center.x + cos(angle) * width * 0.5 * wobble + yOffset * lean,
+        y: center.y + yOffset
+      )
+      if step == 0 {
+        path.move(to: point)
+      } else {
+        path.addLine(to: point)
+      }
+    }
+
+    path.closeSubpath()
+    return path
   }
 
   private func agedWoodWear(size: CGSize) -> some View {

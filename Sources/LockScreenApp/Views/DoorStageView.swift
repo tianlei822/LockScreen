@@ -13,6 +13,9 @@ struct DoorStageView: View {
   let formationTrajectory: FormationTrajectory
   let woodKnockCount: Int
 
+  @State private var rendersSplitDoors = false
+  @State private var splitDoorsOpen = false
+
   private var isOpen: Bool { phase != .awaitingSequence }
 
   var body: some View {
@@ -22,24 +25,42 @@ struct DoorStageView: View {
       ZStack {
         PortalRevealView(theme: theme, isOpen: isOpen)
 
-        HStack(spacing: 1) {
-          leaf(side: .left, fullSize: size)
-            .rotation3DEffect(
-              .degrees(isOpen ? -104 : 0),
-              axis: (x: 0, y: 1, z: 0),
-              anchor: .leading,
-              perspective: 0.62
-            )
-            .offset(x: isOpen ? -size.width * 0.06 : 0)
+        if rendersSplitDoors {
+          HStack(spacing: 1) {
+            leaf(side: .left, fullSize: size)
+              .rotation3DEffect(
+                .degrees(splitDoorsOpen ? -104 : 0),
+                axis: (x: 0, y: 1, z: 0),
+                anchor: .leading,
+                perspective: 0.62
+              )
+              .offset(x: splitDoorsOpen ? -size.width * 0.06 : 0)
 
-          leaf(side: .right, fullSize: size)
-            .rotation3DEffect(
-              .degrees(isOpen ? 104 : 0),
-              axis: (x: 0, y: 1, z: 0),
-              anchor: .trailing,
-              perspective: 0.62
-            )
-            .offset(x: isOpen ? size.width * 0.06 : 0)
+            leaf(side: .right, fullSize: size)
+              .rotation3DEffect(
+                .degrees(splitDoorsOpen ? 104 : 0),
+                axis: (x: 0, y: 1, z: 0),
+                anchor: .trailing,
+                perspective: 0.62
+              )
+              .offset(x: splitDoorsOpen ? size.width * 0.06 : 0)
+          }
+          .animation(.easeInOut(duration: 1.45), value: splitDoorsOpen)
+          .transition(.identity)
+        } else {
+          // While sealed, both clipped leaves show halves of the same full
+          // artwork. Render that artwork once and only create split copies when
+          // the door actually opens; Five Phases is otherwise needlessly built
+          // and rasterized twice on its first frame.
+          DoorArtworkView(
+            theme: theme,
+            phase: phase,
+            formationEnergy: formationEnergy,
+            formationTrajectory: formationTrajectory,
+            woodKnockCount: woodKnockCount
+          )
+          .frame(width: size.width, height: size.height)
+          .transition(.identity)
         }
 
         // Light spilling through the seam as the doors part.
@@ -66,10 +87,28 @@ struct DoorStageView: View {
       }
       .background(Color.black)
       .clipped()
+      .onChange(of: isOpen) {
+        prepareDoorPresentation(isOpen: isOpen)
+      }
     }
     .animation(.easeInOut(duration: 1.45), value: isOpen)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("\(theme.title), \(isOpen ? "open" : "sealed")")
+  }
+
+  private func prepareDoorPresentation(isOpen: Bool) {
+    guard isOpen else {
+      splitDoorsOpen = false
+      rendersSplitDoors = false
+      return
+    }
+
+    rendersSplitDoors = true
+    splitDoorsOpen = false
+    Task { @MainActor in
+      await Task.yield()
+      splitDoorsOpen = true
+    }
   }
 
   private func leaf(side: DoorSide, fullSize: CGSize) -> some View {

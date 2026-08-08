@@ -10,7 +10,8 @@ struct LockScreenView: View {
   private let backgroundMode: Bool
 
   init(
-    initialTheme: DoorTheme = .wood, vaultPasscode: String = "1024", backgroundMode: Bool = false
+    initialTheme: DoorTheme = .formation, vaultPasscode: String = "1024",
+    backgroundMode: Bool = false
   ) {
     self.backgroundMode = backgroundMode
     _flow = State(initialValue: LockFlow(theme: initialTheme, vaultPasscode: vaultPasscode))

@@ -34,6 +34,34 @@ final class FormationTrajectoryTests: XCTestCase {
     XCTAssertEqual(FormationTrajectoryMatcher.score(points, for: .circle), 0)
   }
 
+  func testImperfectSingleLoopActivatesFivePhases() {
+    let points = (0..<48).map { index in
+      let angle = Double(index) / 48 * 2 * Double.pi
+      let handVariation = 1 + sin(angle * 3) * 0.28 + cos(angle * 5) * 0.12
+      return NormalizedPoint(
+        x: 0.5 + cos(angle) * 0.38 * handVariation,
+        y: 0.5 + sin(angle) * 0.4 * handVariation
+      )
+    }
+
+    let score = FormationTrajectoryMatcher.score(points, for: .circle)
+
+    XCTAssertGreaterThanOrEqual(score, FormationTrajectoryMatcher.activationThreshold)
+  }
+
+  func testOpenZigzagDoesNotActivateFivePhases() {
+    let points = (0..<16).map { index in
+      NormalizedPoint(
+        x: 0.08 + Double(index) * 0.055,
+        y: index.isMultiple(of: 2) ? 0.18 : 0.82
+      )
+    }
+
+    let score = FormationTrajectoryMatcher.score(points, for: .circle)
+
+    XCTAssertLessThan(score, FormationTrajectoryMatcher.activationThreshold)
+  }
+
   func testTraceCompletionTracksHowMuchOfTheFormationWasDrawn() {
     let template = FormationTrajectoryMatcher.template(for: .circle, sampleCount: 96)
 
