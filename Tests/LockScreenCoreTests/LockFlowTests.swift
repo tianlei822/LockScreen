@@ -29,6 +29,10 @@ final class LockFlowTests: XCTestCase {
     XCTAssertEqual(flow.phase, .unlocking)
   }
 
+  func testCompletedVaultSubmissionClearsTheEnteredPasscode() {
+    XCTAssertTrue(VaultPasscodeResult.completed.clearsPasscodeEntry)
+  }
+
   func testWrongVaultPasscodeStaysSealed() {
     var flow = LockFlow(theme: .vault, vaultPasscode: "2580")
 

@@ -96,6 +96,15 @@ public enum VaultPasscodeResult: Equatable, Sendable {
   case incorrect
   case completed
   case ignored
+
+  public var clearsPasscodeEntry: Bool {
+    switch self {
+    case .incorrect, .completed:
+      true
+    case .ignored:
+      false
+    }
+  }
 }
 
 public struct LockFlow: Equatable, Sendable {

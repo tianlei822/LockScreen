@@ -4,6 +4,7 @@ import SwiftUI
 struct VaultPasscodeView: View {
   let onSubmit: (String) -> VaultPasscodeResult
 
+  @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
   @State private var passcode = ""
   @State private var status = "ENTER ACCESS CODE"
   @State private var isRejected = false
@@ -106,6 +107,9 @@ struct VaultPasscodeView: View {
       .onAppear {
         isFocused = true
       }
+      .onChange(of: ritualAnimationsPaused) { _, _ in
+        resetForNextSession()
+      }
     }
   }
 
@@ -158,12 +162,16 @@ struct VaultPasscodeView: View {
       return
     }
 
-    switch onSubmit(passcode) {
+    let result = onSubmit(passcode)
+    if result.clearsPasscodeEntry {
+      passcode.removeAll()
+    }
+
+    switch result {
     case .completed:
       status = "ACCESS GRANTED"
       isRejected = false
     case .incorrect:
-      passcode.removeAll()
       reject(message: "ACCESS DENIED")
     case .ignored:
       break
@@ -183,6 +191,14 @@ struct VaultPasscodeView: View {
         isShaking = false
       }
     }
+  }
+
+  private func resetForNextSession() {
+    passcode.removeAll()
+    status = "ENTER ACCESS CODE"
+    isRejected = false
+    isShaking = false
+    isFocused = !ritualAnimationsPaused
   }
 
   private func keypadAccessibilityLabel(_ key: String) -> String {
