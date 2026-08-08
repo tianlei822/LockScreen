@@ -22,6 +22,15 @@ struct FivePhaseCycleState {
     return 0
   }
 
+  /// Fades one stable elemental scene through the phase boundary. This avoids
+  /// constructing two full Canvas hierarchies during every handoff.
+  var stageOpacity: Double {
+    let edge = 0.12
+    if progress < edge { return smoothstep(progress / edge) }
+    if progress > 1 - edge { return smoothstep((1 - progress) / edge) }
+    return 1
+  }
+
   private func smoothstep(_ value: Double) -> Double {
     let clamped = max(0, min(1, value))
     return clamped * clamped * (3 - 2 * clamped)
@@ -43,22 +52,16 @@ struct FivePhaseCycleField: View {
   var body: some View {
     let cycle = FivePhaseCycleState(time: time)
 
-    ZStack {
-      ForEach(FivePhaseElement.allCases) { element in
-        FivePhaseAttributeStage(
-          element: element,
-          diameter: diameter,
-          time: time,
-          energy: energy,
-          isActivated: isActivated
-        )
-        .opacity(cycle.opacity(for: element))
-        .scaleEffect(0.86 + cycle.opacity(for: element) * 0.14)
-        .zIndex(element == cycle.current ? 1 : 0)
-      }
-    }
+    FivePhaseAttributeStage(
+      element: cycle.current,
+      diameter: diameter,
+      time: time,
+      energy: energy,
+      isActivated: isActivated
+    )
+    .opacity(cycle.stageOpacity)
+    .scaleEffect(0.9 + cycle.stageOpacity * 0.1)
     .frame(width: diameter, height: diameter)
-    .animation(.linear(duration: 0.08), value: cycle.current)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Five Phases cycle, \(cycle.current.accessibilityName) active")
   }
@@ -88,6 +91,13 @@ private struct FivePhaseAttributeStage: View {
       )
       .frame(width: diameter * 0.78, height: diameter * 0.78)
       .blendMode(.plusLighter)
+
+      FivePhaseOuterOrbitField(
+        element: element,
+        diameter: diameter,
+        time: time,
+        energy: energy
+      )
 
       FormationConstellation(
         element: element,
@@ -132,6 +142,13 @@ private struct FivePhaseAttributeStage: View {
       .opacity(element == .fire ? 0.68 : 1)
       .shadow(color: element.color, radius: 12 + energy * 16)
 
+      FivePhaseElementCore(
+        element: element,
+        diameter: diameter,
+        time: time,
+        energy: energy
+      )
+
       ForEach(0..<6, id: \.self) { index in
         Circle()
           .fill(index.isMultiple(of: 2) ? Color.white : element.color)
@@ -165,18 +182,61 @@ private struct FivePhaseAttributeStage: View {
   private var woodPattern: some View {
     ZStack {
       ForEach(0..<6, id: \.self) { index in
-        BranchFormationShape(phase: time * 0.9 + Double(index))
+        ZStack {
+          BranchFormationShape(phase: time * 0.9 + Double(index))
+            .stroke(
+              Color(red: 0.18, green: 0.075, blue: 0.025).opacity(0.72),
+              style: StrokeStyle(
+                lineWidth: 4.2 + CGFloat(index.isMultiple(of: 2) ? 1.5 : 0.4),
+                lineCap: .round,
+                lineJoin: .round
+              )
+            )
+
+          BranchFormationShape(phase: time * 0.9 + Double(index))
+            .stroke(
+              LinearGradient(
+                colors: [
+                  Color(red: 0.2, green: 0.48, blue: 0.11),
+                  element.color.opacity(0.9),
+                  Color(red: 0.08, green: 0.3, blue: 0.1),
+                ],
+                startPoint: .bottom,
+                endPoint: .top
+              ),
+              style: StrokeStyle(
+                lineWidth: 0.9 + CGFloat(index.isMultiple(of: 2) ? 1.4 : 0.5) + energy,
+                lineCap: .round,
+                lineJoin: .round
+              )
+            )
+        }
+        .frame(width: diameter * 0.23, height: diameter * 0.42)
+        .offset(y: -diameter * 0.18)
+        .rotationEffect(.degrees(Double(index) * 60 + time * 4))
+      }
+
+      ForEach(0..<6, id: \.self) { index in
+        CurlingVineShape(phase: time * 1.05 + Double(index) * 0.8)
           .stroke(
-            element.color.opacity(0.32 + energy * 0.3),
+            LinearGradient(
+              colors: [
+                Color(red: 0.12, green: 0.34, blue: 0.075),
+                element.color.opacity(0.86),
+              ],
+              startPoint: .bottom,
+              endPoint: .top
+            ),
             style: StrokeStyle(
-              lineWidth: 0.8 + CGFloat(index.isMultiple(of: 2) ? 1.2 : 0.4) + energy,
+              lineWidth: 1.15 + CGFloat(index % 2) * 0.7 + energy * 0.6,
               lineCap: .round,
               lineJoin: .round
             )
           )
-          .frame(width: diameter * 0.23, height: diameter * 0.42)
-          .offset(y: -diameter * 0.18)
-          .rotationEffect(.degrees(Double(index) * 60 + time * 4))
+          .frame(width: diameter * 0.17, height: diameter * 0.26)
+          .offset(y: -diameter * 0.27)
+          .rotationEffect(.degrees(Double(index) * 60 - time * 5.5))
+          .shadow(color: element.color.opacity(0.42), radius: 3 + energy * 3)
       }
 
       ForEach(0..<12, id: \.self) { index in
@@ -245,6 +305,20 @@ private struct FivePhaseAttributeStage: View {
         color: element.color
       )
       .offset(y: diameter * 0.035)
+
+      ForEach(0..<5, id: \.self) { index in
+        EarthPlanetNode(
+          size: diameter * (index.isMultiple(of: 2) ? 0.054 : 0.038),
+          time: time,
+          index: index,
+          energy: energy,
+          color: element.color
+        )
+        .offset(y: -diameter * (0.38 + CGFloat(index % 2) * 0.055))
+        .rotationEffect(
+          .degrees(Double(index) * 72 + time * Double(index.isMultiple(of: 2) ? 7 : -5))
+        )
+      }
 
       ForEach(0..<2, id: \.self) { index in
         Rectangle()
@@ -323,6 +397,54 @@ private struct FivePhaseAttributeStage: View {
         color: element.color
       )
 
+      ForEach(0..<3, id: \.self) { index in
+        WaterCurrentSpiral(phase: time * (1.2 + Double(index) * 0.16) + Double(index))
+          .trim(from: 0.05 + Double(index) * 0.08, to: 0.84 - Double(index) * 0.04)
+          .stroke(
+            LinearGradient(
+              colors: [
+                Color.white.opacity(0.68),
+                element.color.opacity(0.72),
+                Color(red: 0.025, green: 0.18, blue: 0.48).opacity(0.34),
+              ],
+              startPoint: .topLeading,
+              endPoint: .bottomTrailing
+            ),
+            style: StrokeStyle(
+              lineWidth: 1.15 + CGFloat(index) * 0.58 + energy * 0.7,
+              lineCap: .round,
+              lineJoin: .round
+            )
+          )
+          .frame(
+            width: diameter * (0.34 + CGFloat(index) * 0.12),
+            height: diameter * (0.25 + CGFloat(index) * 0.09)
+          )
+          .rotationEffect(.degrees(Double(index) * 52 - time * Double(7 + index * 2)))
+          .shadow(color: element.color.opacity(0.48), radius: 4 + energy * 4)
+      }
+
+      ForEach(0..<10, id: \.self) { index in
+        WaterDropletShape()
+          .fill(
+            LinearGradient(
+              colors: [.white.opacity(0.82), element.color, Color.blue.opacity(0.4)],
+              startPoint: .topLeading,
+              endPoint: .bottomTrailing
+            )
+          )
+          .frame(
+            width: diameter * (index.isMultiple(of: 3) ? 0.018 : 0.012),
+            height: diameter * (index.isMultiple(of: 3) ? 0.03 : 0.022)
+          )
+          .offset(
+            y: -diameter
+              * (0.29 + CGFloat(index % 3) * 0.037 + sin(time * 1.4 + Double(index)) * 0.012)
+          )
+          .rotationEffect(.degrees(Double(index) * 36 + time * 11))
+          .shadow(color: element.color, radius: 3 + energy * 4)
+      }
+
       ForEach(0..<2, id: \.self) { index in
         ResonantRing(
           phase: -time * (1.5 + Double(index) * 0.18),
@@ -347,13 +469,334 @@ private struct FivePhaseAttributeStage: View {
   }
 }
 
+private struct FivePhaseOuterOrbitField: View {
+  let element: FivePhaseElement
+  let diameter: CGFloat
+  let time: TimeInterval
+  let energy: Double
+
+  var body: some View {
+    Canvas(rendersAsynchronously: true) { context, size in
+      let center = CGPoint(x: size.width / 2, y: size.height / 2)
+      let unit = min(size.width, size.height)
+
+      for ring in 0..<4 {
+        let radius = unit * (0.365 + CGFloat(ring) * 0.043)
+        let segmentCount = 8 + ring * 3
+        for segment in 0..<segmentCount {
+          let phase = time * (ring.isMultiple(of: 2) ? 0.18 : -0.14)
+          let start = Double(segment) * 2 * .pi / Double(segmentCount) + phase
+          let span = 2 * .pi / Double(segmentCount) * (0.48 + Double((segment + ring) % 3) * 0.12)
+          let wave = 0.5 + 0.5 * sin(time * 2.05 - Double(segment) * 0.63 + Double(ring))
+          var arc = Path()
+          arc.addArc(
+            center: center,
+            radius: radius,
+            startAngle: .radians(start),
+            endAngle: .radians(start + span),
+            clockwise: false
+          )
+          context.stroke(
+            arc,
+            with: .color(
+              (ring.isMultiple(of: 2) ? element.color : Color.white)
+                .opacity(0.08 + wave * 0.13 + energy * 0.09)
+            ),
+            style: StrokeStyle(
+              lineWidth: 0.45 + CGFloat(ring) * 0.22 + wave * 0.9,
+              lineCap: .round
+            )
+          )
+        }
+      }
+
+      for node in 0..<24 {
+        let angle = Double(node) * 2 * .pi / 24 - time * 0.11
+        let radius = unit * (node.isMultiple(of: 3) ? 0.49 : 0.462)
+        let pulse = 0.5 + 0.5 * sin(time * 2.8 + Double(node) * 1.13)
+        let point = CGPoint(
+          x: center.x + cos(angle) * radius,
+          y: center.y + sin(angle) * radius
+        )
+        let nodeRadius = CGFloat(0.9 + pulse * (node.isMultiple(of: 3) ? 2.4 : 1.1))
+        context.fill(
+          Path(
+            ellipseIn: CGRect(
+              x: point.x - nodeRadius,
+              y: point.y - nodeRadius,
+              width: nodeRadius * 2,
+              height: nodeRadius * 2
+            )
+          ),
+          with: .color(
+            (node.isMultiple(of: 4) ? Color.white : element.color)
+              .opacity(0.2 + pulse * 0.46 + energy * 0.12)
+          )
+        )
+      }
+    }
+    .frame(width: diameter, height: diameter)
+    .blendMode(.plusLighter)
+    .allowsHitTesting(false)
+  }
+}
+
+private struct FivePhaseElementCore: View {
+  let element: FivePhaseElement
+  let diameter: CGFloat
+  let time: TimeInterval
+  let energy: Double
+
+  var body: some View {
+    let beat = 0.5 + 0.5 * sin(time * 2.6 + Double(element.rawValue))
+    let coreSize = diameter * 0.118
+
+    ZStack {
+      Circle()
+        .fill(
+          RadialGradient(
+            colors: [
+              Color.white.opacity(0.18 + beat * 0.12),
+              element.color.opacity(0.46 + energy * 0.2),
+              Color.black.opacity(0.76),
+            ],
+            center: .topLeading,
+            startRadius: 0,
+            endRadius: coreSize * 0.62
+          )
+        )
+
+      Circle()
+        .stroke(
+          AngularGradient(
+            colors: [element.color, .white, element.color.opacity(0.32), element.color],
+            center: .center
+          ),
+          style: StrokeStyle(lineWidth: 1.3 + beat * 1.2 + energy)
+        )
+        .rotationEffect(.degrees(time * 24))
+
+      FivePhaseCoreTexture(
+        element: element,
+        time: time,
+        energy: energy
+      )
+      .frame(width: coreSize * 0.82, height: coreSize * 0.82)
+
+      coreMotif(size: coreSize)
+        .foregroundStyle(
+          LinearGradient(
+            colors: [.white, element.color, element.color.opacity(0.72)],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+        )
+        .shadow(color: element.color.opacity(0.9), radius: 5 + energy * 7)
+    }
+    .frame(width: coreSize, height: coreSize)
+    .scaleEffect(0.96 + beat * 0.08 + energy * 0.035)
+    .shadow(color: element.color.opacity(0.62), radius: 12 + beat * 7 + energy * 10)
+    .allowsHitTesting(false)
+  }
+
+  @ViewBuilder
+  private func coreMotif(size: CGFloat) -> some View {
+    switch element {
+    case .wood:
+      Image(systemName: "leaf.fill")
+        .font(.system(size: size * 0.48, weight: .bold))
+        .rotationEffect(.degrees(-18 + sin(time * 1.4) * 5))
+    case .fire:
+      Image(systemName: "flame.fill")
+        .font(.system(size: size * 0.54, weight: .black))
+        .scaleEffect(x: 0.94 + sin(time * 3.1) * 0.06, y: 1.04 + sin(time * 3.8) * 0.08)
+    case .earth:
+      Image(systemName: "mountain.2.fill")
+        .font(.system(size: size * 0.48, weight: .bold))
+    case .metal:
+      SpiritSwordGlyph(color: element.color, energy: energy)
+        .frame(width: size * 0.28, height: size * 0.64)
+        .rotationEffect(.degrees(sin(time * 1.7) * 3))
+    case .water:
+      Image(systemName: "drop.fill")
+        .font(.system(size: size * 0.52, weight: .bold))
+        .offset(y: sin(time * 1.8) * size * 0.035)
+    }
+  }
+}
+
+/// Fine material engraving inside the elemental core. Keeping the five
+/// variants in one small Canvas adds depth without expanding the SwiftUI view
+/// hierarchy that must be rebuilt when the active phase changes.
+private struct FivePhaseCoreTexture: View {
+  let element: FivePhaseElement
+  let time: TimeInterval
+  let energy: Double
+
+  var body: some View {
+    Canvas(rendersAsynchronously: true) { context, size in
+      let center = CGPoint(x: size.width / 2, y: size.height / 2)
+      let unit = min(size.width, size.height)
+      let pale = Color.white.opacity(0.16 + energy * 0.12)
+      let tint = element.color.opacity(0.24 + energy * 0.12)
+
+      switch element {
+      case .wood:
+        var veins = Path()
+        veins.move(to: CGPoint(x: center.x, y: size.height * 0.16))
+        veins.addCurve(
+          to: CGPoint(x: center.x, y: size.height * 0.84),
+          control1: CGPoint(x: size.width * 0.4, y: size.height * 0.38),
+          control2: CGPoint(x: size.width * 0.6, y: size.height * 0.62)
+        )
+        for index in 0..<4 {
+          let y = size.height * (0.32 + CGFloat(index) * 0.11)
+          let direction: CGFloat = index.isMultiple(of: 2) ? -1 : 1
+          veins.move(to: CGPoint(x: center.x, y: y))
+          veins.addLine(
+            to: CGPoint(
+              x: center.x + direction * unit * (0.16 + CGFloat(index % 2) * 0.04),
+              y: y - unit * 0.11
+            )
+          )
+        }
+        context.stroke(
+          veins, with: .color(tint),
+          style: StrokeStyle(lineWidth: 0.7, lineCap: .round, lineJoin: .round)
+        )
+
+      case .fire:
+        for index in 0..<3 {
+          let phase = time * (0.34 + Double(index) * 0.05) + Double(index) * 1.8
+          var emberArc = Path()
+          emberArc.addArc(
+            center: center,
+            radius: unit * (0.18 + CGFloat(index) * 0.09),
+            startAngle: .radians(phase),
+            endAngle: .radians(phase + 1.1 + Double(index) * 0.18),
+            clockwise: false
+          )
+          context.stroke(
+            emberArc,
+            with: .color(index == 0 ? pale : tint),
+            style: StrokeStyle(
+              lineWidth: 0.65 + CGFloat(2 - index) * 0.28,
+              lineCap: .round
+            )
+          )
+        }
+
+      case .earth:
+        for ridge in 0..<4 {
+          let y = size.height * (0.3 + CGFloat(ridge) * 0.12)
+          var stratum = Path()
+          stratum.move(to: CGPoint(x: size.width * 0.18, y: y))
+          stratum.addCurve(
+            to: CGPoint(x: size.width * 0.82, y: y + unit * 0.015),
+            control1: CGPoint(x: size.width * 0.36, y: y - unit * 0.065),
+            control2: CGPoint(x: size.width * 0.63, y: y + unit * 0.06)
+          )
+          context.stroke(
+            stratum,
+            with: .color(ridge.isMultiple(of: 2) ? pale : tint),
+            lineWidth: ridge.isMultiple(of: 2) ? 0.8 : 0.5
+          )
+        }
+
+      case .metal:
+        var facets = Path()
+        for index in 0..<8 {
+          let angle = Double(index) * 2 * .pi / 8 + time * 0.045
+          facets.move(
+            to: CGPoint(
+              x: center.x + cos(angle) * unit * 0.1,
+              y: center.y + sin(angle) * unit * 0.1
+            ))
+          facets.addLine(
+            to: CGPoint(
+              x: center.x + cos(angle) * unit * 0.41,
+              y: center.y + sin(angle) * unit * 0.41
+            ))
+        }
+        context.stroke(
+          facets,
+          with: .color(pale),
+          style: StrokeStyle(lineWidth: 0.6, lineCap: .round)
+        )
+
+      case .water:
+        for ripple in 0..<3 {
+          let width = unit * (0.28 + CGFloat(ripple) * 0.18)
+          let height = width * (0.22 + CGFloat(ripple) * 0.035)
+          let drift = sin(time * 0.7 + Double(ripple)) * unit * 0.025
+          context.stroke(
+            Path(
+              ellipseIn: CGRect(
+                x: center.x - width / 2,
+                y: center.y + unit * (0.05 + CGFloat(ripple) * 0.09) + drift,
+                width: width,
+                height: height
+              )
+            ),
+            with: .color(ripple == 0 ? pale : tint),
+            lineWidth: 0.55 + CGFloat(2 - ripple) * 0.16
+          )
+        }
+      }
+    }
+    .allowsHitTesting(false)
+  }
+}
+
+private struct EarthPlanetNode: View {
+  let size: CGFloat
+  let time: TimeInterval
+  let index: Int
+  let energy: Double
+  let color: Color
+
+  var body: some View {
+    ZStack {
+      if index.isMultiple(of: 2) {
+        Ellipse()
+          .stroke(color.opacity(0.46 + energy * 0.16), lineWidth: 0.7 + energy * 0.4)
+          .frame(width: size * 1.65, height: size * 0.48)
+          .rotationEffect(.degrees(-18 + sin(time * 0.8 + Double(index)) * 5))
+      }
+
+      Circle()
+        .fill(
+          RadialGradient(
+            colors: [
+              Color(red: 0.96, green: 0.7, blue: 0.38).opacity(0.9),
+              color.opacity(0.88),
+              Color(red: 0.16, green: 0.06, blue: 0.018),
+            ],
+            center: .topLeading,
+            startRadius: 0,
+            endRadius: size * 0.7
+          )
+        )
+        .overlay {
+          Circle()
+            .trim(from: 0.08, to: 0.42)
+            .stroke(Color.white.opacity(0.34), lineWidth: 0.7)
+            .rotationEffect(.degrees(time * 18 + Double(index) * 41))
+        }
+        .frame(width: size, height: size)
+        .shadow(color: color.opacity(0.62), radius: 5 + energy * 5)
+    }
+    .frame(width: size * 1.7, height: size * 1.2)
+  }
+}
+
 private struct FivePhaseMaterialDetailLayer: View {
   let element: FivePhaseElement
   let time: TimeInterval
   let energy: Double
 
   var body: some View {
-    Canvas { context, size in
+    Canvas(rendersAsynchronously: true) { context, size in
       let center = CGPoint(x: size.width / 2, y: size.height / 2)
       let unit = min(size.width, size.height)
 
@@ -660,7 +1103,7 @@ private struct FormationConstellation: View {
   let energy: Double
 
   var body: some View {
-    Canvas { context, size in
+    Canvas(rendersAsynchronously: true) { context, size in
       let center = CGPoint(x: size.width / 2, y: size.height / 2)
       let unit = min(size.width, size.height)
       let centralRadius = unit * 0.17
@@ -969,6 +1412,72 @@ private struct BranchFormationShape: Shape {
   }
 }
 
+private struct CurlingVineShape: Shape {
+  let phase: Double
+
+  func path(in rect: CGRect) -> Path {
+    let sway = CGFloat(sin(phase)) * rect.width * 0.1
+    return Path { path in
+      path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+      path.addCurve(
+        to: CGPoint(x: rect.midX + sway, y: rect.height * 0.32),
+        control1: CGPoint(x: rect.width * 0.18, y: rect.height * 0.78),
+        control2: CGPoint(x: rect.width * 0.84, y: rect.height * 0.55)
+      )
+      path.addCurve(
+        to: CGPoint(x: rect.midX - rect.width * 0.06, y: rect.height * 0.12),
+        control1: CGPoint(x: rect.width * 0.12, y: rect.height * 0.2),
+        control2: CGPoint(x: rect.width * 0.3, y: rect.height * 0.02)
+      )
+      path.addCurve(
+        to: CGPoint(x: rect.midX + rect.width * 0.12, y: rect.height * 0.2),
+        control1: CGPoint(x: rect.width * 0.72, y: rect.height * 0.04),
+        control2: CGPoint(x: rect.width * 0.8, y: rect.height * 0.18)
+      )
+    }
+  }
+}
+
+private struct WaterCurrentSpiral: Shape {
+  let phase: Double
+
+  func path(in rect: CGRect) -> Path {
+    Path { path in
+      for index in 0...96 {
+        let progress = CGFloat(index) / 96
+        let angle = Double(progress) * .pi * 3.4 + phase
+        let radiusX = rect.width * (0.08 + progress * 0.42)
+        let radiusY = rect.height * (0.08 + progress * 0.42)
+        let ripple = 1 + CGFloat(sin(angle * 2.2 - phase)) * 0.055
+        let point = CGPoint(
+          x: rect.midX + cos(angle) * radiusX * ripple,
+          y: rect.midY + sin(angle) * radiusY * ripple
+        )
+        index == 0 ? path.move(to: point) : path.addLine(to: point)
+      }
+    }
+  }
+}
+
+private struct WaterDropletShape: Shape {
+  func path(in rect: CGRect) -> Path {
+    Path { path in
+      path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+      path.addCurve(
+        to: CGPoint(x: rect.midX, y: rect.maxY),
+        control1: CGPoint(x: rect.maxX * 1.04, y: rect.height * 0.46),
+        control2: CGPoint(x: rect.maxX * 0.9, y: rect.height * 0.82)
+      )
+      path.addCurve(
+        to: CGPoint(x: rect.midX, y: rect.minY),
+        control1: CGPoint(x: rect.minX + rect.width * 0.1, y: rect.height * 0.82),
+        control2: CGPoint(x: rect.minX - rect.width * 0.04, y: rect.height * 0.46)
+      )
+      path.closeSubpath()
+    }
+  }
+}
+
 private struct SpiritSwordFormationShape: Shape {
   func path(in rect: CGRect) -> Path {
     Path { path in
@@ -1091,7 +1600,7 @@ private struct SolarFireDragonFormation: View {
   let energy: Double
 
   var body: some View {
-    Canvas { context, size in
+    Canvas(rendersAsynchronously: true) { context, size in
       let center = CGPoint(x: size.width / 2, y: size.height / 2)
       let unit = min(size.width, size.height) * 0.62
       let solarRadius = unit * 0.145
@@ -1293,6 +1802,29 @@ private struct SolarFireDragonFormation: View {
           style: StrokeStyle(lineWidth: 0.75, lineCap: .round)
         )
 
+        let bodyScale = dragonScalePath(
+          center: bodyPoint,
+          scale: unit * (index.isMultiple(of: 3) ? 0.032 : 0.025),
+          angle: dragonTangentAngle(fraction: fraction)
+        )
+        context.fill(
+          bodyScale,
+          with: .linearGradient(
+            Gradient(colors: [
+              Color.yellow.opacity(0.72),
+              Color.orange.opacity(0.52),
+              Color(red: 0.34, green: 0.006, blue: 0.002).opacity(0.82),
+            ]),
+            startPoint: inner,
+            endPoint: outer
+          )
+        )
+        context.stroke(
+          bodyScale,
+          with: .color(Color(red: 0.26, green: 0.004, blue: 0.002).opacity(0.78)),
+          lineWidth: 0.55
+        )
+
         if index.isMultiple(of: 2) {
           var spine = Path()
           spine.move(to: outer)
@@ -1365,6 +1897,24 @@ private struct SolarFireDragonFormation: View {
           endPoint: CGPoint(x: headCenter.x - headScale, y: headCenter.y + headScale)
         )
       )
+      let ears = dragonEarPath(center: headCenter, scale: headScale, angle: headAngle)
+      context.fill(
+        ears,
+        with: .linearGradient(
+          Gradient(colors: [
+            Color.yellow.opacity(0.86),
+            Color.orange,
+            Color(red: 0.36, green: 0.005, blue: 0.002),
+          ]),
+          startPoint: CGPoint(x: headCenter.x, y: headCenter.y - headScale),
+          endPoint: CGPoint(x: headCenter.x, y: headCenter.y + headScale)
+        )
+      )
+      context.stroke(
+        ears,
+        with: .color(Color(red: 0.28, green: 0.004, blue: 0.002).opacity(0.9)),
+        style: StrokeStyle(lineWidth: 1.4, lineJoin: .round)
+      )
       let head = dragonHeadPath(
         center: headCenter,
         scale: headScale,
@@ -1391,6 +1941,23 @@ private struct SolarFireDragonFormation: View {
         with: .color(Color(red: 0.34, green: 0.006, blue: 0.002).opacity(0.9)),
         style: StrokeStyle(lineWidth: 1.7, lineJoin: .round)
       )
+      let jaw = dragonJawPath(center: headCenter, scale: headScale, angle: headAngle)
+      context.fill(
+        jaw,
+        with: .linearGradient(
+          Gradient(colors: [
+            Color(red: 1, green: 0.62, blue: 0.16),
+            Color(red: 0.55, green: 0.018, blue: 0.006),
+          ]),
+          startPoint: headCenter,
+          endPoint: CGPoint(x: headCenter.x + headScale, y: headCenter.y + headScale)
+        )
+      )
+      context.stroke(
+        jaw,
+        with: .color(Color(red: 0.25, green: 0.003, blue: 0.001).opacity(0.94)),
+        style: StrokeStyle(lineWidth: 1.35, lineJoin: .round)
+      )
       var hornGlow = context
       hornGlow.addFilter(.blur(radius: 5))
       hornGlow.stroke(
@@ -1416,6 +1983,15 @@ private struct SolarFireDragonFormation: View {
         dragonWhiskerPath(center: headCenter, scale: headScale, angle: headAngle),
         with: .color(Color(red: 1, green: 0.9, blue: 0.46).opacity(0.96)),
         style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round)
+      )
+      context.stroke(
+        dragonNostrilSmokePath(center: headCenter, scale: headScale, angle: headAngle),
+        with: .linearGradient(
+          Gradient(colors: [Color.white.opacity(0.78), Color.yellow.opacity(0.5), .clear]),
+          startPoint: headCenter,
+          endPoint: CGPoint(x: headCenter.x + headScale * 1.7, y: headCenter.y)
+        ),
+        style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round)
       )
       context.stroke(
         dragonFangPath(center: headCenter, scale: headScale, angle: headAngle),
@@ -1602,6 +2178,21 @@ private struct SolarFireDragonFormation: View {
     }
   }
 
+  private func dragonScalePath(center: CGPoint, scale: CGFloat, angle: Double) -> Path {
+    let points = [
+      CGPoint(x: -0.72, y: 0),
+      CGPoint(x: 0, y: -0.58),
+      CGPoint(x: 0.72, y: 0),
+      CGPoint(x: 0, y: 0.58),
+    ].map { transform(point: $0, center: center, scale: scale, angle: angle) }
+
+    return Path { path in
+      path.move(to: points[0])
+      for point in points.dropFirst() { path.addLine(to: point) }
+      path.closeSubpath()
+    }
+  }
+
   private func dragonTailFlamePath(center: CGPoint, scale: CGFloat, angle: Double) -> Path {
     let points = [
       CGPoint(x: 0.12, y: 0), CGPoint(x: -0.18, y: -0.24),
@@ -1637,6 +2228,43 @@ private struct SolarFireDragonFormation: View {
       for point in points.dropFirst() {
         path.addLine(to: point)
       }
+      path.closeSubpath()
+    }
+  }
+
+  private func dragonEarPath(center: CGPoint, scale: CGFloat, angle: Double) -> Path {
+    let points = [
+      CGPoint(x: -0.22, y: -0.18),
+      CGPoint(x: -0.72, y: -0.62),
+      CGPoint(x: -0.62, y: -0.04),
+      CGPoint(x: -0.16, y: 0.14),
+      CGPoint(x: -0.58, y: 0.58),
+      CGPoint(x: -0.04, y: 0.42),
+    ].map { transform(point: $0, center: center, scale: scale, angle: angle) }
+
+    return Path { path in
+      path.move(to: points[0])
+      path.addLine(to: points[1])
+      path.addLine(to: points[2])
+      path.closeSubpath()
+      path.move(to: points[3])
+      path.addLine(to: points[4])
+      path.addLine(to: points[5])
+      path.closeSubpath()
+    }
+  }
+
+  private func dragonJawPath(center: CGPoint, scale: CGFloat, angle: Double) -> Path {
+    let points = [
+      CGPoint(x: 0.08, y: 0.2),
+      CGPoint(x: 0.7, y: 0.17),
+      CGPoint(x: 0.58, y: 0.42),
+      CGPoint(x: 0.18, y: 0.38),
+    ].map { transform(point: $0, center: center, scale: scale, angle: angle) }
+
+    return Path { path in
+      path.move(to: points[0])
+      for point in points.dropFirst() { path.addLine(to: point) }
       path.closeSubpath()
     }
   }
@@ -1712,6 +2340,28 @@ private struct SolarFireDragonFormation: View {
     }
   }
 
+  private func dragonNostrilSmokePath(center: CGPoint, scale: CGFloat, angle: Double) -> Path {
+    Path { path in
+      func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+        transform(point: CGPoint(x: x, y: y), center: center, scale: scale, angle: angle)
+      }
+
+      let flutter = CGFloat(sin(time * 2.6)) * 0.12
+      path.move(to: point(0.62, 0.01))
+      path.addCurve(
+        to: point(1.42, -0.18 + flutter),
+        control1: point(0.88, -0.2),
+        control2: point(1.12, 0.08 + flutter)
+      )
+      path.move(to: point(0.64, 0.09))
+      path.addCurve(
+        to: point(1.34, 0.35 - flutter),
+        control1: point(0.9, 0.28),
+        control2: point(1.12, 0.08 - flutter)
+      )
+    }
+  }
+
   private func dragonFangPath(center: CGPoint, scale: CGFloat, angle: Double) -> Path {
     Path { path in
       func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
@@ -1780,7 +2430,7 @@ private struct EarthSealFormation: View {
   let color: Color
 
   var body: some View {
-    Canvas { context, size in
+    Canvas(rendersAsynchronously: true) { context, size in
       let center = CGPoint(x: size.width / 2, y: size.height / 2)
       let radius = min(size.width, size.height) * 0.46
       let sealRect = CGRect(
@@ -1820,6 +2470,21 @@ private struct EarthSealFormation: View {
           width: sealRect.width + CGFloat(ridge) * radius * 0.07,
           height: radius * (0.82 + CGFloat(ridge) * 0.12)
         )
+        let filledPath = earthRidge(in: ridgeRect, seed: 7 + ridge * 5, closesAtBottom: true)
+        terrain.fill(
+          filledPath,
+          with: .linearGradient(
+            Gradient(colors: [
+              Color(red: 0.93, green: 0.66, blue: 0.36).opacity(
+                0.16 + Double(2 - ridge) * 0.08),
+              color.opacity(0.22 + Double(ridge) * 0.08),
+              Color(red: 0.12, green: 0.045, blue: 0.015).opacity(0.74),
+            ]),
+            startPoint: CGPoint(x: ridgeRect.midX, y: ridgeRect.minY),
+            endPoint: CGPoint(x: ridgeRect.midX, y: ridgeRect.maxY)
+          )
+        )
+
         let path = earthRidge(in: ridgeRect, seed: 7 + ridge * 5, closesAtBottom: false)
         var glow = terrain
         glow.addFilter(.blur(radius: 3 + CGFloat(ridge)))
@@ -1912,7 +2577,7 @@ private struct WaterTideFormation: View {
   let color: Color
 
   var body: some View {
-    Canvas { context, size in
+    Canvas(rendersAsynchronously: true) { context, size in
       let center = CGPoint(x: size.width / 2, y: size.height / 2)
       let radius = min(size.width, size.height) * 0.46
       let sealRect = CGRect(

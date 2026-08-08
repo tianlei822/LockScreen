@@ -49,7 +49,7 @@ struct FivePhaseSigil: View {
         )
         .rotationEffect(.degrees(time * (element.rawValue.isMultiple(of: 2) ? 18 : -18)))
 
-      Canvas { context, canvasSize in
+      Canvas(rendersAsynchronously: true) { context, canvasSize in
         let paths = paths(for: element, in: canvasSize)
 
         for (index, path) in paths.enumerated() {
