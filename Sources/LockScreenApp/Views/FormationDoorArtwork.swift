@@ -5,6 +5,7 @@ struct FormationDoorArtwork: View {
   let energy: Double
   let isActivated: Bool
   let trajectory: FormationTrajectory
+  @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
 
   private let ink = Color(red: 0.008, green: 0.025, blue: 0.048)
   private var cyan: Color { trajectory.visualStyle.primary }
@@ -18,7 +19,10 @@ struct FormationDoorArtwork: View {
 
   var body: some View {
     TimelineView(
-      .animation(minimumInterval: trajectory == .circle ? 1 / 24 : 1 / 20)
+      .animation(
+        minimumInterval: trajectory == .circle ? 1 / 24 : 1 / 20,
+        paused: ritualAnimationsPaused
+      )
     ) { timeline in
       GeometryReader { proxy in
         let size = proxy.size

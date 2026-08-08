@@ -7,6 +7,7 @@ struct LockScreenView: View {
   @State private var controlsVisible = true
   @State private var controlsVisibilityTask: Task<Void, Never>?
   @State private var isImmersive = false
+  @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
   private let backgroundMode: Bool
 
   init(
@@ -101,7 +102,9 @@ struct LockScreenView: View {
 
   private func header(palette: ThemePalette) -> some View {
     ZStack(alignment: .top) {
-      TimelineView(.periodic(from: .now, by: 1)) { timeline in
+      TimelineView(
+        .animation(minimumInterval: 1, paused: ritualAnimationsPaused)
+      ) { timeline in
         VStack(spacing: 5) {
           Text(timeline.date, format: .dateTime.hour().minute())
             .font(.system(size: 64, weight: .bold, design: .rounded))

@@ -3,11 +3,14 @@ import SwiftUI
 
 struct AtmosphericBackground: View {
   let theme: DoorTheme
+  @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
 
   var body: some View {
     let palette = theme.palette
 
-    TimelineView(.animation(minimumInterval: 1 / 24)) { timeline in
+    TimelineView(
+      .animation(minimumInterval: 1 / 24, paused: ritualAnimationsPaused)
+    ) { timeline in
       let time = timeline.date.timeIntervalSinceReferenceDate
 
       GeometryReader { proxy in

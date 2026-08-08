@@ -6,11 +6,14 @@ import SwiftUI
 struct ThresholdDetailOverlay: View {
   let theme: DoorTheme
   let isOpen: Bool
+  @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
 
   var body: some View {
     let palette = theme.palette
 
-    TimelineView(.animation(minimumInterval: 1 / 20)) { timeline in
+    TimelineView(
+      .animation(minimumInterval: 1 / 20, paused: ritualAnimationsPaused)
+    ) { timeline in
       GeometryReader { proxy in
         let size = proxy.size
         let time = timeline.date.timeIntervalSinceReferenceDate

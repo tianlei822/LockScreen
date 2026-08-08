@@ -5,9 +5,12 @@ struct VaultDoorArtwork: View {
   private let steel = Color(red: 0.18, green: 0.21, blue: 0.22)
   private let warmSteel = Color(red: 0.32, green: 0.3, blue: 0.25)
   private let amber = Color(red: 0.94, green: 0.61, blue: 0.18)
+  @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1 / 20)) { timeline in
+    TimelineView(
+      .animation(minimumInterval: 1 / 20, paused: ritualAnimationsPaused)
+    ) { timeline in
       GeometryReader { proxy in
         let size = proxy.size
         let unit = min(size.width, size.height)

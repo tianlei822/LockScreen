@@ -35,16 +35,52 @@ struct LockScreenApp: App {
 
   var body: some Scene {
     WindowGroup {
-      LockScreenView(
-        initialTheme: AppConfiguration.initialTheme,
-        vaultPasscode: AppConfiguration.vaultPasscode,
-        backgroundMode: AppConfiguration.backgroundMode
-      )
-      .frame(minWidth: 900, minHeight: 640)
+      if AppConfiguration.backgroundMode {
+        // The background scene only bootstraps AppKit. Building the full ritual
+        // here would leave a hidden SwiftUI animation tree running forever.
+        Color.clear
+          .frame(minWidth: 900, minHeight: 640)
+          .accessibilityHidden(true)
+      } else {
+        LockScreenView(
+          initialTheme: AppConfiguration.initialTheme,
+          vaultPasscode: AppConfiguration.vaultPasscode,
+          backgroundMode: false
+        )
+        .frame(minWidth: 900, minHeight: 640)
+      }
     }
     .defaultSize(width: 1180, height: 780)
     .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentMinSize)
+  }
+}
+
+@MainActor
+private final class RitualRenderActivity: ObservableObject {
+  @Published private(set) var state = RitualRenderState()
+
+  func present() {
+    guard !state.isPresented else { return }
+    state.present()
+  }
+
+  func retreat() {
+    guard state.isPresented else { return }
+    state.retreat()
+  }
+}
+
+private struct HostedRitualView: View {
+  @ObservedObject var activity: RitualRenderActivity
+
+  var body: some View {
+    LockScreenView(
+      initialTheme: AppConfiguration.initialTheme,
+      vaultPasscode: AppConfiguration.vaultPasscode,
+      backgroundMode: AppConfiguration.backgroundMode
+    )
+    .environment(\.ritualAnimationsPaused, activity.state.pausesAnimations)
   }
 }
 
@@ -274,6 +310,7 @@ enum WindowPresentation {
   private static var screenCovers: [NSWindow] = []
   private static var ritualWindow: NSWindow?
   private static var coverageReassertionTask: Task<Void, Never>?
+  private static let renderActivity = RitualRenderActivity()
 
   /// The ritual window, as opposed to a secondary-display cover.
   static func mainRitualWindow() -> NSWindow? {
@@ -288,6 +325,8 @@ enum WindowPresentation {
   static func enterImmersive(_ sourceWindow: NSWindow) {
     let window = dedicatedRitualWindow(from: sourceWindow)
     guard let screen = window.screen ?? NSScreen.main else { return }
+
+    renderActivity.present()
 
     window.level = .screenSaver
     window.collectionBehavior = [
@@ -362,6 +401,7 @@ enum WindowPresentation {
     dismissScreenCovers()
     NSApp.presentationOptions = []
     IdleSuppression.end()
+    renderActivity.retreat()
 
     window?.level = .normal
     window?.orderOut(nil)
@@ -371,6 +411,8 @@ enum WindowPresentation {
 
   private static func enterWindowed(_ window: NSWindow) {
     guard let screen = window.screen ?? NSScreen.main else { return }
+
+    renderActivity.present()
 
     coverageReassertionTask?.cancel()
     dismissScreenCovers()
@@ -438,11 +480,8 @@ enum WindowPresentation {
     window.delegate = sourceWindow.delegate
 
     let hostingView = NSHostingView(
-      rootView: LockScreenView(
-        initialTheme: AppConfiguration.initialTheme,
-        vaultPasscode: AppConfiguration.vaultPasscode,
-        backgroundMode: AppConfiguration.backgroundMode
-      ))
+      rootView: HostedRitualView(activity: renderActivity)
+    )
     hostingView.autoresizingMask = [.width, .height]
     window.contentView = hostingView
 

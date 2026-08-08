@@ -128,6 +128,7 @@ private struct FormationTraceCanvas: View {
   let trajectory: FormationTrajectory
   let energy: Double
   let onTrace: (Double) -> Void
+  @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
 
   private enum TraceOutcome {
     case complete
@@ -146,7 +147,10 @@ private struct FormationTraceCanvas: View {
 
   var body: some View {
     TimelineView(
-      .animation(minimumInterval: trajectory == .circle ? 1 / 24 : 1 / 20)
+      .animation(
+        minimumInterval: trajectory == .circle ? 1 / 24 : 1 / 20,
+        paused: ritualAnimationsPaused
+      )
     ) { timeline in
       GeometryReader { proxy in
         let size = proxy.size
