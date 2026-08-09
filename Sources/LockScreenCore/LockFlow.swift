@@ -136,7 +136,7 @@ public struct LockFlow: Equatable, Sendable {
     lastMove = nil
     woodKnockCount = 0
     formationEnergy = 0
-    formationTrajectory = .infinity
+    formationTrajectory = .circle
   }
 
   @discardableResult

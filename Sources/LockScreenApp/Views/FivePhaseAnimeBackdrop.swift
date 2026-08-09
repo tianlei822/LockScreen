@@ -1,3 +1,4 @@
+import LockScreenCore
 import SwiftUI
 
 /// Full-door anime-style phenomena synchronized with the currently active phase.

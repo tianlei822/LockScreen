@@ -1,53 +1,21 @@
+import LockScreenCore
 import SwiftUI
 
-struct FivePhaseCycleState {
-  static let stageDuration = 3.4
-
-  let current: FivePhaseElement
-  let next: FivePhaseElement
-  let progress: Double
-
-  init(time: TimeInterval) {
-    let stage = Int(floor(time / Self.stageDuration))
-    let elements = FivePhaseElement.allCases
-    current = elements[Self.positiveModulo(stage, elements.count)]
-    next = elements[Self.positiveModulo(stage + 1, elements.count)]
-    progress = (time - floor(time / Self.stageDuration) * Self.stageDuration) / Self.stageDuration
-  }
-
-  func opacity(for element: FivePhaseElement) -> Double {
-    let transition = smoothstep((progress - 0.76) / 0.24)
-    if element == current { return 1 - transition }
-    if element == next { return transition }
-    return 0
-  }
-
-  /// Fades one stable elemental scene through the phase boundary. This avoids
-  /// constructing two full Canvas hierarchies during every handoff.
-  var stageOpacity: Double {
-    let edge = 0.12
-    if progress < edge { return smoothstep(progress / edge) }
-    if progress > 1 - edge { return smoothstep((1 - progress) / edge) }
-    return 1
-  }
-
-  private func smoothstep(_ value: Double) -> Double {
-    let clamped = max(0, min(1, value))
-    return clamped * clamped * (3 - 2 * clamped)
-  }
-
-  private static func positiveModulo(_ value: Int, _ divisor: Int) -> Int {
-    let result = value % divisor
-    return result >= 0 ? result : result + divisor
-  }
-}
-
 /// Plays one elemental discipline at a time, cross-fading into the next phase.
-struct FivePhaseCycleField: View {
+struct FivePhaseCycleField: View, Equatable {
   let diameter: CGFloat
   let time: TimeInterval
   let energy: Double
   let isActivated: Bool
+
+  nonisolated private static let frameRate = 15.0
+
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+    floor(lhs.time * frameRate) == floor(rhs.time * frameRate)
+      && lhs.diameter == rhs.diameter
+      && lhs.energy == rhs.energy
+      && lhs.isActivated == rhs.isActivated
+  }
 
   var body: some View {
     let cycle = FivePhaseCycleState(time: time)

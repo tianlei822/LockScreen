@@ -3,16 +3,16 @@ import XCTest
 @testable import LockScreenCore
 
 final class LockFlowTests: XCTestCase {
-  func testDefaultFlowStartsWithBaguaFormation() {
+  func testDefaultFlowStartsWithFivePhasesFormation() {
     let flow = LockFlow()
 
     XCTAssertEqual(flow.theme, .formation)
-    XCTAssertEqual(flow.formationTrajectory, .infinity)
+    XCTAssertEqual(flow.formationTrajectory, .circle)
   }
 
-  func testThemeAndFormationOrderingPrioritizesBaguaThenWoodenDoor() {
+  func testThemeAndFormationOrderingPrioritizesFivePhasesThenBaguaThenThunder() {
     XCTAssertEqual(Array(DoorTheme.allCases.prefix(2)), [.formation, .wood])
-    XCTAssertEqual(FormationTrajectory.allCases, [.infinity, .circle, .triangle])
+    XCTAssertEqual(FormationTrajectory.allCases, [.circle, .infinity, .triangle])
   }
 
   func testConfiguredVaultPasscodeStartsUnlocking() {
@@ -93,9 +93,9 @@ final class LockFlowTests: XCTestCase {
     var flow = LockFlow(theme: .formation)
     _ = flow.applyFormationTrace(score: 0.5)
 
-    flow.selectFormationTrajectory(.circle)
+    flow.selectFormationTrajectory(.infinity)
 
-    XCTAssertEqual(flow.formationTrajectory, .circle)
+    XCTAssertEqual(flow.formationTrajectory, .infinity)
     XCTAssertEqual(flow.formationEnergy, 0)
   }
 

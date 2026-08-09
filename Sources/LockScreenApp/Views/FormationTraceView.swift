@@ -148,7 +148,7 @@ private struct FormationTraceCanvas: View {
   var body: some View {
     TimelineView(
       .animation(
-        minimumInterval: trajectory == .circle ? 1 / 24 : 1 / 20,
+        minimumInterval: trajectory == .circle ? 1 / 18 : 1 / 20,
         paused: ritualAnimationsPaused
       )
     ) { timeline in

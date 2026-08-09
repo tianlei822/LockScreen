@@ -29,7 +29,7 @@ struct LightningStormField: View {
           cloudBank(size: size, strike: strike, intensity: intensity)
         }
 
-        Canvas { context, canvasSize in
+        Canvas(rendersAsynchronously: true) { context, canvasSize in
           guard intensity > 0.004 else { return }
           var random = SeededLightningRandom(seed: strike.seed)
           let boltCount = presentation == .backdrop ? 3 : 1
@@ -113,96 +113,157 @@ struct LightningStormField: View {
       )
       .blendMode(.plusLighter)
 
-      Canvas { context, canvasSize in
+      Canvas(rendersAsynchronously: true) { context, canvasSize in
         let cloudSeed = UInt64(bitPattern: Int64(seedOffset &* 104_729)) &+ 0x9E37_79B9
         var random = SeededLightningRandom(seed: cloudSeed)
-
-        for index in 0..<8 {
-          let baseAngle = Double(index) / 8 * 2 * Double.pi + random.next() * 0.32
+        typealias CloudProfile = (
+          orbitX: CGFloat,
+          orbitY: CGFloat,
+          width: CGFloat,
+          height: CGFloat,
+          variant: Int
+        )
+        let profiles: [CloudProfile] = [
+          (0.4, 0.34, 0.28, 0.105, 0),
+          (0.43, 0.39, 0.12, 0.052, 1),
+          (0.38, 0.36, 0.21, 0.072, 2),
+          (0.44, 0.32, 0.15, 0.086, 1),
+          (0.39, 0.4, 0.245, 0.082, 2),
+          (0.45, 0.35, 0.105, 0.045, 0),
+          (0.37, 0.38, 0.225, 0.098, 1),
+          (0.42, 0.33, 0.14, 0.058, 2),
+        ]
+        for (index, profile) in profiles.enumerated() {
+          let baseAngle =
+            Double(index) / Double(profiles.count) * 2 * Double.pi + random.next() * 0.32
           let direction = index.isMultiple(of: 2) ? 1.0 : -1.0
           let angle = baseAngle + time * (0.018 + random.next() * 0.012) * direction
           let drift = sin(time * (0.18 + Double(index) * 0.015) + Double(index))
           let center = CGPoint(
-            x: canvasSize.width * 0.5 + cos(angle) * canvasSize.width * 0.41,
-            y: canvasSize.height * 0.5 + sin(angle) * canvasSize.height * 0.37
+            x: canvasSize.width * 0.5 + cos(angle) * canvasSize.width * profile.orbitX,
+            y: canvasSize.height * 0.5 + sin(angle) * canvasSize.height * profile.orbitY
               + drift * canvasSize.height * 0.012
           )
-          let width = canvasSize.width * (0.13 + random.next() * 0.1)
-          let height = canvasSize.height * (0.05 + random.next() * 0.035)
+          let width = canvasSize.width * profile.width
+          let height = canvasSize.height * profile.height
           let flicker = pow(
             0.5 + 0.5 * sin(time * (2.25 + Double(index) * 0.31) + Double(index) * 1.7),
             6
           )
-          let path = thunderCloudPath(center: center, width: width, height: height)
+          let dischargeWave =
+            index.isMultiple(of: 3)
+            ? pow(
+              0.5
+                + 0.5
+                * sin(time * (3.15 + Double(index) * 0.18) - Double(index) * 1.23),
+              7
+            )
+            : 0
+          let dischargeIntensity = min(1, intensity * 0.92 + dischargeWave * 0.68)
+          let cloudCharge = min(1, flicker + dischargeIntensity * 0.82)
+          let path = thunderCloudPath(
+            center: center,
+            width: width,
+            height: height,
+            variant: profile.variant
+          )
           let shadowPath = thunderCloudPath(
             center: CGPoint(x: center.x, y: center.y + height * 0.14),
             width: width * 0.94,
-            height: height * 0.88
+            height: height * 0.88,
+            variant: profile.variant
           )
           var haze = context
           haze.addFilter(.blur(radius: 12))
           haze.fill(
             path,
             with: .color(
-              style.primary.opacity(0.065 + intensity * 0.1 + flicker * 0.14)
+              style.primary.opacity(0.085 + intensity * 0.12 + cloudCharge * 0.18)
             )
           )
           context.fill(
             shadowPath,
             with: .color(
-              Color(red: 0.025, green: 0.03, blue: 0.075).opacity(0.32 + flicker * 0.12)
+              Color(red: 0.025, green: 0.03, blue: 0.075).opacity(
+                0.38 + cloudCharge * 0.14
+              )
             )
           )
           context.fill(
             path,
             with: .linearGradient(
               Gradient(colors: [
-                style.secondary.opacity(0.055 + flicker * 0.12),
+                style.secondary.opacity(0.09 + cloudCharge * 0.16),
                 Color(red: 0.07, green: 0.075, blue: 0.15)
-                  .opacity(0.34 + flicker * 0.12),
+                  .opacity(0.38 + cloudCharge * 0.16),
                 Color(red: 0.025, green: 0.03, blue: 0.08)
-                  .opacity(0.46 + flicker * 0.08),
+                  .opacity(0.5 + cloudCharge * 0.1),
               ]),
               startPoint: CGPoint(x: center.x, y: center.y - height * 0.54),
               endPoint: CGPoint(x: center.x, y: center.y + height * 0.34)
             )
           )
           context.stroke(
-            thunderCloudRimPath(center: center, width: width, height: height),
-            with: .color(
-              style.secondary.opacity(0.08 + intensity * 0.12 + flicker * 0.32)
+            thunderCloudRimPath(
+              center: center,
+              width: width,
+              height: height,
+              variant: profile.variant
             ),
-            lineWidth: 0.7 + flicker * 1.4
+            with: .color(
+              style.secondary.opacity(0.13 + intensity * 0.16 + cloudCharge * 0.44)
+            ),
+            lineWidth: 0.85 + cloudCharge * 1.65
           )
           context.stroke(
-            thunderCloudUndersidePath(center: center, width: width, height: height),
+            thunderCloudUndersidePath(
+              center: center,
+              width: width,
+              height: height,
+              variant: profile.variant
+            ),
             with: .color(
-              style.primary.opacity(0.07 + intensity * 0.14 + flicker * 0.38)
+              style.primary.opacity(0.11 + intensity * 0.18 + cloudCharge * 0.48)
             ),
             style: StrokeStyle(
-              lineWidth: 0.75 + flicker * 1.65,
+              lineWidth: 0.9 + cloudCharge * 1.85,
               lineCap: .round,
               lineJoin: .round
             )
           )
 
-          if index.isMultiple(of: 3), flicker > 0.2 {
-            let spark = thunderCloudSparkPath(
-              center: center,
-              width: width,
-              height: height,
-              direction: index.isMultiple(of: 2) ? 1 : -1
-            )
-            context.stroke(
-              spark,
-              with: .color(style.primary.opacity((0.16 + intensity * 0.24) * flicker)),
-              style: StrokeStyle(lineWidth: 2.8 + flicker * 2.1, lineCap: .round)
-            )
-            context.stroke(
-              spark,
-              with: .color(Color.white.opacity((0.2 + intensity * 0.28) * flicker)),
-              style: StrokeStyle(lineWidth: 0.55 + flicker * 0.52, lineCap: .round)
-            )
+          if index.isMultiple(of: 3) {
+            if dischargeIntensity > 0.12 {
+              let start = CGPoint(
+                x: center.x + width * (index.isMultiple(of: 2) ? 0.08 : -0.1),
+                y: center.y + height * 0.24
+              )
+              let dischargeSeed =
+                strike.seed
+                &+ UInt64(index + 1) &* 0x9E37_79B9_7F4A_7C15
+              var dischargeRandom = SeededLightningRandom(seed: dischargeSeed)
+              let horizontalShift =
+                CGFloat(dischargeRandom.next() - 0.5) * canvasSize.width * 0.66
+              let landingX = min(
+                max(start.x + horizontalShift, canvasSize.width * 0.045),
+                canvasSize.width * 0.955
+              )
+              let target = CGPoint(
+                x: landingX,
+                y: canvasSize.height * CGFloat(0.94 + dischargeRandom.next() * 0.14)
+              )
+              let discharge = cloudDischargeGeometry(
+                from: start,
+                to: target,
+                seed: dischargeSeed ^ 0xD1B5_4A32_D192_ED03
+              )
+              draw(
+                discharge,
+                in: &context,
+                intensity: dischargeIntensity,
+                isDistant: false
+              )
+            }
           }
         }
       }
@@ -257,40 +318,114 @@ struct LightningStormField: View {
     .blendMode(.plusLighter)
   }
 
-  private func thunderCloudPath(center: CGPoint, width: CGFloat, height: CGFloat) -> Path {
+  private func thunderCloudPath(
+    center: CGPoint,
+    width: CGFloat,
+    height: CGFloat,
+    variant: Int
+  ) -> Path {
     var path = Path()
-    path.addEllipse(
-      in: CGRect(
-        x: center.x - width * 0.5,
-        y: center.y - height * 0.08,
-        width: width,
-        height: height * 0.62
-      ))
-    path.addEllipse(
-      in: CGRect(
-        x: center.x - width * 0.38,
-        y: center.y - height * 0.42,
-        width: width * 0.42,
-        height: height * 0.78
-      ))
-    path.addEllipse(
-      in: CGRect(
-        x: center.x - width * 0.08,
-        y: center.y - height * 0.55,
-        width: width * 0.48,
-        height: height * 0.95
-      ))
-    path.addEllipse(
-      in: CGRect(
-        x: center.x + width * 0.2,
-        y: center.y - height * 0.3,
-        width: width * 0.3,
-        height: height * 0.68
-      ))
+
+    switch variant % 3 {
+    case 1:
+      path.addEllipse(
+        in: CGRect(
+          x: center.x - width * 0.48,
+          y: center.y - height * 0.02,
+          width: width * 0.96,
+          height: height * 0.52
+        ))
+      path.addEllipse(
+        in: CGRect(
+          x: center.x - width * 0.34,
+          y: center.y - height * 0.5,
+          width: width * 0.38,
+          height: height * 0.92
+        ))
+      path.addEllipse(
+        in: CGRect(
+          x: center.x - width * 0.08,
+          y: center.y - height * 0.7,
+          width: width * 0.36,
+          height: height * 1.15
+        ))
+      path.addEllipse(
+        in: CGRect(
+          x: center.x + width * 0.2,
+          y: center.y - height * 0.28,
+          width: width * 0.28,
+          height: height * 0.68
+        ))
+    case 2:
+      path.addEllipse(
+        in: CGRect(
+          x: center.x - width * 0.54,
+          y: center.y,
+          width: width * 1.08,
+          height: height * 0.48
+        ))
+      path.addEllipse(
+        in: CGRect(
+          x: center.x - width * 0.46,
+          y: center.y - height * 0.34,
+          width: width * 0.36,
+          height: height * 0.72
+        ))
+      path.addEllipse(
+        in: CGRect(
+          x: center.x - width * 0.16,
+          y: center.y - height * 0.48,
+          width: width * 0.5,
+          height: height * 0.86
+        ))
+      path.addEllipse(
+        in: CGRect(
+          x: center.x + width * 0.2,
+          y: center.y - height * 0.2,
+          width: width * 0.34,
+          height: height * 0.56
+        ))
+    default:
+      path.addEllipse(
+        in: CGRect(
+          x: center.x - width * 0.5,
+          y: center.y - height * 0.08,
+          width: width,
+          height: height * 0.62
+        ))
+      path.addEllipse(
+        in: CGRect(
+          x: center.x - width * 0.38,
+          y: center.y - height * 0.42,
+          width: width * 0.42,
+          height: height * 0.78
+        ))
+      path.addEllipse(
+        in: CGRect(
+          x: center.x - width * 0.08,
+          y: center.y - height * 0.55,
+          width: width * 0.48,
+          height: height * 0.95
+        ))
+      path.addEllipse(
+        in: CGRect(
+          x: center.x + width * 0.2,
+          y: center.y - height * 0.3,
+          width: width * 0.3,
+          height: height * 0.68
+        ))
+    }
     return path
   }
 
-  private func thunderCloudRimPath(center: CGPoint, width: CGFloat, height: CGFloat) -> Path {
+  private func thunderCloudRimPath(
+    center: CGPoint,
+    width: CGFloat,
+    height: CGFloat,
+    variant: Int
+  ) -> Path {
+    let crownLift: CGFloat = variant % 3 == 1 ? 0.46 : variant % 3 == 2 ? 0.24 : 0.3
+    let skew: CGFloat = variant % 3 == 2 ? 0.07 : variant % 3 == 1 ? -0.035 : 0
     var path = Path()
     path.move(to: CGPoint(x: center.x - width * 0.46, y: center.y + height * 0.08))
     path.addCurve(
@@ -299,9 +434,18 @@ struct LightningStormField: View {
       control2: CGPoint(x: center.x - width * 0.3, y: center.y - height * 0.28)
     )
     path.addCurve(
-      to: CGPoint(x: center.x + width * 0.12, y: center.y - height * 0.3),
-      control1: CGPoint(x: center.x - width * 0.08, y: center.y - height * 0.5),
-      control2: CGPoint(x: center.x + width * 0.06, y: center.y - height * 0.52)
+      to: CGPoint(
+        x: center.x + width * (0.12 + skew),
+        y: center.y - height * crownLift
+      ),
+      control1: CGPoint(
+        x: center.x - width * (0.08 - skew),
+        y: center.y - height * (crownLift + 0.2)
+      ),
+      control2: CGPoint(
+        x: center.x + width * (0.06 + skew),
+        y: center.y - height * (crownLift + 0.22)
+      )
     )
     path.addCurve(
       to: CGPoint(x: center.x + width * 0.46, y: center.y + height * 0.08),
@@ -314,10 +458,16 @@ struct LightningStormField: View {
   private func thunderCloudUndersidePath(
     center: CGPoint,
     width: CGFloat,
-    height: CGFloat
+    height: CGFloat,
+    variant: Int
   ) -> Path {
-    Path { path in
-      path.move(to: CGPoint(x: center.x - width * 0.46, y: center.y + height * 0.16))
+    let slant: CGFloat = variant % 3 == 2 ? 0.05 : variant % 3 == 1 ? -0.035 : 0
+    return Path { path in
+      path.move(
+        to: CGPoint(
+          x: center.x - width * (0.46 - slant),
+          y: center.y + height * 0.16
+        ))
       path.addCurve(
         to: CGPoint(x: center.x - width * 0.15, y: center.y + height * 0.27),
         control1: CGPoint(x: center.x - width * 0.36, y: center.y + height * 0.24),
@@ -329,38 +479,75 @@ struct LightningStormField: View {
         control2: CGPoint(x: center.x + width * 0.05, y: center.y + height * 0.32)
       )
       path.addCurve(
-        to: CGPoint(x: center.x + width * 0.46, y: center.y + height * 0.13),
+        to: CGPoint(
+          x: center.x + width * (0.46 + slant),
+          y: center.y + height * 0.13
+        ),
         control1: CGPoint(x: center.x + width * 0.28, y: center.y + height * 0.28),
         control2: CGPoint(x: center.x + width * 0.38, y: center.y + height * 0.22)
       )
     }
   }
 
-  private func thunderCloudSparkPath(
-    center: CGPoint,
-    width: CGFloat,
-    height: CGFloat,
-    direction: CGFloat
-  ) -> Path {
-    Path { path in
-      let start = CGPoint(
-        x: center.x + width * 0.08 * direction,
-        y: center.y + height * 0.2
-      )
-      path.move(to: start)
-      path.addLine(
-        to: CGPoint(x: start.x - width * 0.035 * direction, y: start.y + height * 0.18)
-      )
-      path.addLine(
-        to: CGPoint(x: start.x + width * 0.02 * direction, y: start.y + height * 0.27)
-      )
-      path.addLine(
-        to: CGPoint(x: start.x - width * 0.07 * direction, y: start.y + height * 0.46)
-      )
-      path.addLine(
-        to: CGPoint(x: start.x - width * 0.015 * direction, y: start.y + height * 0.58)
+  private func cloudDischargeGeometry(
+    from start: CGPoint,
+    to target: CGPoint,
+    seed: UInt64
+  ) -> LightningGeometry {
+    var random = SeededLightningRandom(seed: seed)
+    let deltaX = target.x - start.x
+    let deltaY = target.y - start.y
+    let distance = max(1, hypot(deltaX, deltaY))
+    let tangent = CGPoint(x: deltaX / distance, y: deltaY / distance)
+    let normal = CGPoint(x: -deltaY / distance, y: deltaX / distance)
+    let stepCount = 11 + Int(random.next() * 6)
+    var points = [start]
+
+    for step in 1..<stepCount {
+      let progress = CGFloat(step) / CGFloat(stepCount)
+      let envelope = 0.42 + sin(progress * .pi) * 0.58
+      let jitter = CGFloat(random.next() - 0.5) * min(distance * 0.13, 54) * envelope
+      points.append(
+        CGPoint(
+          x: start.x + deltaX * progress + normal.x * jitter,
+          y: start.y + deltaY * progress + normal.y * jitter
+        )
       )
     }
+    points.append(target)
+
+    let trunk = lightningStroke(connecting: points, endScale: 0.38)
+    let branchCount = 1 + Int(random.next() * 3)
+    var branches: [LightningStroke] = []
+
+    for branchIndex in 0..<branchCount {
+      let availableStartCount = max(1, points.count - 6)
+      let startIndex = 3 + Int(random.next() * Double(availableStartCount))
+      let branchStart = points[min(startIndex, points.count - 3)]
+      let side: CGFloat =
+        (branchIndex.isMultiple(of: 2) ? 1 : -1)
+        * (random.next() > 0.5 ? 1 : -1)
+      let branchSteps = 3 + Int(random.next() * 4)
+      let lateralReach = distance * CGFloat(0.08 + random.next() * 0.13) * side
+      let downwardReach = distance * CGFloat(0.05 + random.next() * 0.12)
+      var branchPoints = [branchStart]
+
+      for step in 1...branchSteps {
+        let progress = CGFloat(step) / CGFloat(branchSteps)
+        let jitter = CGFloat(random.next() - 0.5) * distance * 0.025
+        branchPoints.append(
+          CGPoint(
+            x: branchStart.x + normal.x * lateralReach * progress
+              + tangent.x * downwardReach * progress + normal.x * jitter,
+            y: branchStart.y + normal.y * lateralReach * progress
+              + tangent.y * downwardReach * progress + normal.y * jitter
+          )
+        )
+      }
+      branches.append(lightningStroke(connecting: branchPoints, endScale: 0.16))
+    }
+
+    return LightningGeometry(trunk: trunk, branches: branches)
   }
 
   private func lightningGeometry(

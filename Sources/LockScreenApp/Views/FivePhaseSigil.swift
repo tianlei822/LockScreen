@@ -1,14 +1,7 @@
+import LockScreenCore
 import SwiftUI
 
-enum FivePhaseElement: Int, CaseIterable, Identifiable {
-  case wood
-  case fire
-  case earth
-  case metal
-  case water
-
-  var id: Self { self }
-
+extension FivePhaseElement {
   var accessibilityName: String {
     switch self {
     case .wood: "Wood"

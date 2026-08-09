@@ -1,8 +1,8 @@
 import Foundation
 
 public enum FormationTrajectory: String, CaseIterable, Identifiable, Sendable {
-  case infinity
   case circle
+  case infinity
   case triangle
 
   public var id: Self { self }

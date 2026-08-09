@@ -20,7 +20,7 @@ struct FormationDoorArtwork: View {
   var body: some View {
     TimelineView(
       .animation(
-        minimumInterval: trajectory == .circle ? 1 / 24 : 1 / 20,
+        minimumInterval: trajectory == .circle ? 1 / 18 : 1 / 20,
         paused: ritualAnimationsPaused
       )
     ) { timeline in
@@ -221,7 +221,7 @@ struct FormationDoorArtwork: View {
   }
 
   private func formationLattice(size: CGSize, time: TimeInterval) -> some View {
-    Canvas { context, _ in
+    Canvas(rendersAsynchronously: true) { context, _ in
       let spacing: CGFloat = 34
       let drift = CGFloat(time.truncatingRemainder(dividingBy: 3)) * 3
 
@@ -255,7 +255,7 @@ struct FormationDoorArtwork: View {
 
   /// Concentric guide circles with radial spokes, like the engraved base of an array disc.
   private func polarLattice(size: CGSize, diameter: CGFloat, time: TimeInterval) -> some View {
-    Canvas { context, _ in
+    Canvas(rendersAsynchronously: true) { context, _ in
       let center = CGPoint(x: size.width / 2, y: size.height / 2)
 
       for step in 1...6 {
@@ -423,7 +423,7 @@ struct FormationDoorArtwork: View {
 
   /// Hexagram chord network with pulsing intersection nodes.
   private func starMap(diameter: CGFloat, time: TimeInterval, level: Double) -> some View {
-    Canvas { context, _ in
+    Canvas(rendersAsynchronously: true) { context, _ in
       let center = CGPoint(x: diameter / 2, y: diameter / 2)
       let radius = diameter / 2
       let glow = 0.45 + 0.55 * level
@@ -513,7 +513,7 @@ struct FormationDoorArtwork: View {
   private func risingParticles(size: CGSize, diameter: CGFloat, time: TimeInterval, level: Double)
     -> some View
   {
-    Canvas { context, _ in
+    Canvas(rendersAsynchronously: true) { context, _ in
       let center = CGPoint(x: size.width / 2, y: size.height / 2)
       let count = isActivated ? 110 : 34 + Int(level * 46)
       let cycle = diameter * 0.98

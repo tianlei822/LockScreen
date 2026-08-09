@@ -152,9 +152,7 @@ struct LockScreenView: View {
     Menu {
       ForEach(DoorTheme.allCases) { theme in
         Button {
-          withAnimation(.easeInOut(duration: 0.45)) {
-            flow.selectTheme(theme)
-          }
+          flow.selectTheme(theme)
         } label: {
           if theme == flow.theme {
             Label(theme.title, systemImage: "checkmark")

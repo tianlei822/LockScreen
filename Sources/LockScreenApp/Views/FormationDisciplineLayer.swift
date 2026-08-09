@@ -27,6 +27,7 @@ struct FormationDisciplineLayer: View {
       energy: energy,
       isActivated: isActivated
     )
+    .equatable()
   }
 
   private var baguaFormation: some View {
@@ -521,11 +522,18 @@ private struct ThunderFormationCanvas: View {
           .foregroundStyle(style.secondary.opacity(glyphOpacity))
       )
       var centerGlyphContext = context
-      centerGlyphContext.addFilter(.blur(radius: 0.45 + CGFloat(glyphWave) * 0.9))
+      centerGlyphContext.addFilter(.blur(radius: 4.5 + CGFloat(glyphWave) * 4.5))
       centerGlyphContext.draw(centerGlyph, at: center, anchor: .center)
 
       for ring in 0..<4 {
         let ringFlash = 0.38 + 0.62 * (0.5 + 0.5 * sin(time * 3.1 - Double(ring) * 1.2))
+        let ringLineScale =
+          ring.isMultiple(of: 2)
+          ? breathingLineScale(
+            frequency: 1.72 + Double(ring) * 0.08,
+            phase: -Double(ring) * 1.15
+          )
+          : 1
         let radius = unit * (0.19 + CGFloat(ring) * 0.078)
         context.stroke(
           Path(
@@ -541,9 +549,10 @@ private struct ThunderFormationCanvas: View {
               .opacity((0.14 + Double(3 - ring) * 0.05 + energy * 0.22) * ringFlash)
           ),
           style: StrokeStyle(
-            lineWidth: (ring == 3 ? 2.4 : ring == 1 ? 1.65 : 0.72)
+            lineWidth: (ring == 3 ? 2.4 : ring == 1 ? 1.65 : 0.82)
               * (ring.isMultiple(of: 2) ? outwardBeat : inwardBeat)
-              * (0.78 + CGFloat(ringFlash) * 0.44),
+              * (0.78 + CGFloat(ringFlash) * 0.44)
+              * ringLineScale,
             dash: ring == 2 ? [unit * 0.018, unit * 0.012] : []
           )
         )
@@ -571,6 +580,10 @@ private struct ThunderFormationCanvas: View {
                 * sin(time * (4.15 + Double(band) * 0.86) - Double(segment) * 0.63),
               2.2
             )
+          let segmentLineScale = breathingLineScale(
+            frequency: 1.86 + Double(band) * 0.16,
+            phase: -Double(segment) * 0.51 - Double(band) * 0.8
+          )
           let halfSpan =
             Double.pi / Double(segmentCount)
             * (segment.isMultiple(of: 3) ? 0.66 : 0.42)
@@ -593,11 +606,14 @@ private struct ThunderFormationCanvas: View {
           context.stroke(
             scriptSegment,
             with: .color(
-              segmentColor.opacity((0.14 + energy * 0.22) * segmentFlash)
+              segmentColor.opacity(
+                (0.16 + energy * 0.24) * (0.42 + segmentFlash * 0.58)
+              )
             ),
             style: StrokeStyle(
-              lineWidth: (segment.isMultiple(of: 3) ? 1.55 : 0.72)
-                * (0.68 + CGFloat(segmentFlash) * 0.64),
+              lineWidth: (segment.isMultiple(of: 3) ? 1.5 : 0.86)
+                * (0.72 + CGFloat(segmentFlash) * 0.46)
+                * segmentLineScale,
               lineCap: .square
             )
           )
@@ -613,15 +629,20 @@ private struct ThunderFormationCanvas: View {
           + 0.5
           * sin(time * (4.7 + Double(conduit % 4) * 0.37) - Double(conduit) * 0.78)
         let conduitFlash = 0.16 + 0.84 * pow(conduitWave, 2.45)
+        let conduitLineScale = breathingLineScale(
+          frequency: 1.64 + Double(conduit % 3) * 0.13,
+          phase: -Double(conduit) * 0.72
+        )
         context.stroke(
           thunderConduitPath(center: center, unit: unit, angle: angle, index: conduit),
           with: .color(
             (conduit.isMultiple(of: 3) ? style.flare : style.secondary)
-              .opacity((0.16 + energy * 0.25) * conduitFlash)
+              .opacity((0.17 + energy * 0.26) * (0.4 + conduitFlash * 0.6))
           ),
           style: StrokeStyle(
-            lineWidth: (conduit.isMultiple(of: 3) ? 1.75 : 0.82)
-              * (0.62 + CGFloat(conduitFlash) * 0.72),
+            lineWidth: (conduit.isMultiple(of: 3) ? 1.7 : 0.9)
+              * (0.7 + CGFloat(conduitFlash) * 0.5)
+              * conduitLineScale,
             lineCap: .square,
             lineJoin: .miter
           )
@@ -830,15 +851,20 @@ private struct ThunderFormationCanvas: View {
       for rune in 0..<18 {
         let angle = Double(rune) * 2 * Double.pi / 18 - rotation * 0.75
         let runeFlash = 0.2 + 0.8 * (0.5 + 0.5 * sin(time * 4.8 - Double(rune) * 0.72))
+        let runeLineScale = breathingLineScale(
+          frequency: 1.92 + Double(rune % 4) * 0.09,
+          phase: -Double(rune) * 0.6
+        )
         context.stroke(
           chevronPath(center: center, unit: unit, angle: angle),
           with: .color(
             (rune.isMultiple(of: 3) ? style.flare : style.primary)
-              .opacity((0.28 + energy * 0.25) * runeFlash)
+              .opacity((0.29 + energy * 0.26) * (0.38 + runeFlash * 0.62))
           ),
           style: StrokeStyle(
-            lineWidth: (rune.isMultiple(of: 3) ? 1.8 : 0.8)
-              * (rune.isMultiple(of: 2) ? outwardBeat : inwardBeat),
+            lineWidth: (rune.isMultiple(of: 3) ? 1.7 : 0.88)
+              * (rune.isMultiple(of: 2) ? outwardBeat : inwardBeat)
+              * runeLineScale,
             lineCap: .round,
             lineJoin: .miter
           )
@@ -848,6 +874,13 @@ private struct ThunderFormationCanvas: View {
       for layer in 0..<3 {
         let sides = layer == 2 ? 6 : 3
         let layerFlash = 0.42 + 0.58 * (0.5 + 0.5 * sin(time * 3.7 + Double(layer) * 1.8))
+        let layerLineScale =
+          layer == 1
+          ? 1
+          : breathingLineScale(
+            frequency: 1.48 + Double(layer) * 0.16,
+            phase: Double(layer) * 1.9
+          )
         context.stroke(
           regularPolygon(
             center: center,
@@ -862,7 +895,8 @@ private struct ThunderFormationCanvas: View {
           ),
           style: StrokeStyle(
             lineWidth: (layer == 1 ? 2.4 : 0.95)
-              * (layer.isMultiple(of: 2) ? outwardBeat : inwardBeat),
+              * (layer.isMultiple(of: 2) ? outwardBeat : inwardBeat)
+              * layerLineScale,
             lineJoin: .miter,
             dash: layer == 2 ? [10, 5, 2, 5] : []
           )
@@ -874,6 +908,11 @@ private struct ThunderFormationCanvas: View {
 
   private func polarPoint(center: CGPoint, radius: CGFloat, angle: Double) -> CGPoint {
     CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
+  }
+
+  private func breathingLineScale(frequency: Double, phase: Double) -> CGFloat {
+    let wave = 0.5 + 0.5 * sin(time * frequency + phase)
+    return 0.82 + CGFloat(pow(wave, 2.3)) * 1.58
   }
 
   private func inwardLightningPath(
