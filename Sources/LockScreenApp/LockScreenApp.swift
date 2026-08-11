@@ -86,6 +86,15 @@ private struct HostedRitualView: View {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
+  /// Space transitions can temporarily detach overlay windows, so refresh as
+  /// soon as AppKit reports that the active Space changed.
+  /// Source: https://developer.apple.com/documentation/appkit/nsworkspace/activespacedidchangenotification
+  static let coverageRefreshNotifications: [NSNotification.Name] = [
+    NSWorkspace.sessionDidBecomeActiveNotification,
+    NSWorkspace.didWakeNotification,
+    NSWorkspace.activeSpaceDidChangeNotification,
+  ]
+
   private var screenObserver: NSObjectProtocol?
   private var workspaceObservers: [NSObjectProtocol] = []
   private var statusItem: NSStatusItem?
@@ -112,7 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     let workspaceCenter = NSWorkspace.shared.notificationCenter
-    for name in [NSWorkspace.sessionDidBecomeActiveNotification, NSWorkspace.didWakeNotification] {
+    for name in Self.coverageRefreshNotifications {
       workspaceObservers.append(
         workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { _ in
           Task { @MainActor in
@@ -314,6 +323,12 @@ enum WindowPresentation {
     .disableHideApplication,
   ]
 
+  /// Cover ordinary Spaces plus other apps' full-screen and Stage Manager sets.
+  /// Source: https://developer.apple.com/documentation/appkit/nswindow/collectionbehavior-swift.struct/canjoinallapplications
+  static let overlayCollectionBehavior: NSWindow.CollectionBehavior = [
+    .canJoinAllSpaces, .canJoinAllApplications, .fullScreenAuxiliary, .stationary, .ignoresCycle,
+  ]
+
   private static var screenCovers: [NSWindow] = []
   private static var ritualWindow: NSWindow?
   private static var coverageReassertionTask: Task<Void, Never>?
@@ -336,9 +351,7 @@ enum WindowPresentation {
     renderActivity.present()
 
     window.level = .screenSaver
-    window.collectionBehavior = [
-      .canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle,
-    ]
+    window.collectionBehavior = overlayCollectionBehavior
     window.isMovable = false
     window.hasShadow = false
     setWindowButtonsHidden(true, in: window)
@@ -511,7 +524,7 @@ enum WindowPresentation {
       cover.backgroundColor = .black
       cover.isOpaque = true
       cover.hasShadow = false
-      cover.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+      cover.collectionBehavior = overlayCollectionBehavior
       cover.contentView = NSHostingView(rootView: Color.black)
       cover.orderFront(nil)
       screenCovers.append(cover)

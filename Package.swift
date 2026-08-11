@@ -20,5 +20,9 @@ let package = Package(
       name: "LockScreenCoreTests",
       dependencies: ["LockScreenCore"]
     ),
+    .testTarget(
+      name: "LockScreenAppTests",
+      dependencies: ["LockScreenApp"]
+    ),
   ]
 )
