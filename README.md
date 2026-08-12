@@ -11,8 +11,8 @@ Requirements: macOS 14 or later and Xcode 16 or later.
 要求：macOS 14 或更高版本、Xcode 16 或更高版本。
 
 ```sh
-# Build and run; covers the current workspace with an immersive borderless window.
-# 构建并运行；启动后以无边框沉浸窗口覆盖当前工作页面。
+# Build and run an unbundled immersive preview.
+# 构建并运行未打包的沉浸预览。
 swift run LockScreen
 
 # Development preview without automatic fullscreen.
@@ -88,7 +88,7 @@ TCC 权限连续性。可通过 `APPLE_SIGNING_IDENTITY` 指定其他证书；�
 - After a successful ritual, the doors finish opening, the app hides immediately, and the previous workspace becomes active without an intermediate window. / 仪式成功后，门完成开启，应用立即隐藏并激活之前的工作页面，不再出现中间窗口。
 - Press `⇧⌘F` or use the upper-right button to toggle immersive/windowed mode. / 按 `⇧⌘F` 或点击右上角按钮切换沉浸/窗口模式。
 - Press `⌘L` anywhere to summon the ritual while the background lurker runs (registered globally via Carbon, so it also works on top of other apps; it takes precedence over apps that use `⌘L` themselves, e.g. browser address bars). / 后台潜伏运行时在任意处按 `⌘L` 召唤仪式（经 Carbon 全局注册，在其他应用之上也生效；会抢占浏览器地址栏等自身使用 `⌘L` 的场景）。
-- Immersive mode is a kiosk-style takeover: the menu bar and Dock are hidden, secondary displays are blanked, and app switching/force quit are disabled while the ritual is frontmost. Exit with `⇧⌘F` or `⌘Q`. Note that an unbundled `swift run` binary is not allowed to become the frontmost app on recent macOS, so full coverage requires the bundled app from `sh Scripts/build-app.sh`. / 沉浸模式是 kiosk 式接管：隐藏菜单栏与程序坞、副屏黑屏遮盖，且仪式在前台时禁用应用切换与强制退出；可用 `⇧⌘F` 或 `⌘Q` 退出。注意 macOS 不允许未打包的 `swift run` 二进制成为最前应用，完整覆盖效果需使用 `sh Scripts/build-app.sh` 打包后的应用。
+- Immersive mode is a kiosk-style takeover: its overlay joins every Space, the menu bar and Dock are hidden, secondary displays are blanked, and app switching/force quit are disabled while the ritual is frontmost. Exit with `⇧⌘F` or `⌘Q`. Note that an unbundled `swift run` binary is not allowed to become the frontmost app on recent macOS, so full coverage requires the bundled app from `sh Scripts/build-app.sh`. / 沉浸模式是 kiosk 式接管：浮层会加入所有工作区，同时隐藏菜单栏与程序坞、以黑屏遮盖副屏，并在仪式位于最前时禁用应用切换与强制退出；可用 `⇧⌘F` 或 `⌘Q` 退出。注意 macOS 不允许未打包的 `swift run` 二进制成为最前应用，完整覆盖效果需使用 `sh Scripts/build-app.sh` 打包后的应用。
 
 ## Verification / 验证
 

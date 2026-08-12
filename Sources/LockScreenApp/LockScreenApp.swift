@@ -97,6 +97,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     NSWorkspace.activeSpaceDidChangeNotification,
   ]
 
+  static func shouldTerminateAfterLastWindowClosed(
+    backgroundMode: Bool,
+    ritualIsImmersive: Bool
+  ) -> Bool {
+    !backgroundMode && !ritualIsImmersive
+  }
+
   private var screenObserver: NSObjectProtocol?
   private var workspaceObservers: [NSObjectProtocol] = []
   private var statusItem: NSStatusItem?
@@ -201,7 +208,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
   }
 
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    !AppConfiguration.backgroundMode
+    let ritualIsImmersive =
+      WindowPresentation.mainRitualWindow()
+      .map(WindowPresentation.isImmersive) ?? false
+    return Self.shouldTerminateAfterLastWindowClosed(
+      backgroundMode: AppConfiguration.backgroundMode,
+      ritualIsImmersive: ritualIsImmersive
+    )
   }
 
   /// In background mode the window is only hidden, never closed, so ⌘L can
@@ -311,6 +324,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 }
 
 @MainActor
+private final class RitualPanel: NSPanel {
+  override var canBecomeKey: Bool { true }
+}
+
+@MainActor
 enum WindowPresentation {
   /// Kiosk-style options so the ritual truly owns the screen while immersive:
   /// menu bar and Dock stay hidden, app switching / force quit are disabled.
@@ -347,25 +365,22 @@ enum WindowPresentation {
   }
 
   static func enterImmersive(_ sourceWindow: NSWindow) {
+    guard let screen = sourceWindow.screen ?? NSScreen.main else { return }
+
+    // Accessory semantics plus a nonactivating panel let this system-style
+    // overlay join other Spaces without activating and moving its owning app.
+    // Source: https://developer.apple.com/documentation/appkit/nswindow/stylemask-swift.struct/nonactivatingpanel
+    NSApp.setActivationPolicy(.accessory)
     let window = dedicatedRitualWindow(from: sourceWindow)
-    guard let screen = window.screen ?? NSScreen.main else { return }
 
     renderActivity.present()
     restoreWindowOpacity(window)
 
-    window.level = .screenSaver
-    window.collectionBehavior = overlayCollectionBehavior
-    window.isMovable = false
-    window.hasShadow = false
+    configureForImmersivePresentation(window)
     setWindowButtonsHidden(true, in: window)
 
-    // Keep background mode status-bar-only. Normal and unbundled launches
-    // still need the regular activation policy to become frontmost.
-    if !AppConfiguration.backgroundMode {
-      NSApp.setActivationPolicy(.regular)
-    }
-    window.makeKeyAndOrderFront(nil)
-    NSApp.activate()
+    window.orderFrontRegardless()
+    window.makeKey()
     NSApp.presentationOptions = kioskOptions
 
     // A borderless window can match the display exactly. Standard titled
@@ -375,7 +390,6 @@ enum WindowPresentation {
 
     IdleSuppression.begin()
     coverSecondaryScreens(except: screen)
-    window.styleMask = [.borderless]
     scheduleCoverageReassertion()
   }
 
@@ -391,19 +405,15 @@ enum WindowPresentation {
     else { return }
 
     NSApp.presentationOptions = kioskOptions
-    if !NSApp.isActive {
-      NSApp.activate()
-    }
 
-    window.level = .screenSaver
-    window.hasShadow = false
+    configureForImmersivePresentation(window)
 
     let target = screen.frame
     if window.frame != target {
       window.setFrame(target, display: true)
     }
     window.orderFrontRegardless()
-    window.styleMask = [.borderless]
+    window.makeKey()
   }
 
   /// Re-blank secondary displays after a display is (dis)connected mid-session.
@@ -465,7 +475,16 @@ enum WindowPresentation {
     window.titlebarAppearsTransparent = true
     window.isMovable = true
     window.hasShadow = true
+    if let panel = window as? NSPanel {
+      panel.isFloatingPanel = false
+      panel.hidesOnDeactivate = true
+    }
     setWindowButtonsHidden(false, in: window)
+
+    if !AppConfiguration.backgroundMode {
+      NSApp.setActivationPolicy(.regular)
+      NSApp.activate()
+    }
 
     let visibleFrame = screen.visibleFrame
     let size = NSSize(
@@ -498,19 +517,14 @@ enum WindowPresentation {
 
   /// SwiftUI owns the WindowGroup style and can restore its title bar after a
   /// kiosk or login-session transition. Keep that scene window hidden and
-  /// render the ritual in a dedicated AppKit borderless window instead.
+  /// render the ritual in a dedicated nonactivating AppKit panel instead.
   private static func dedicatedRitualWindow(from sourceWindow: NSWindow) -> NSWindow {
     if let ritualWindow {
       return ritualWindow
     }
 
     let frame = sourceWindow.screen?.frame ?? NSScreen.main?.frame ?? sourceWindow.frame
-    let window = NSWindow(
-      contentRect: frame,
-      styleMask: [.borderless],
-      backing: .buffered,
-      defer: false
-    )
+    let window = makeRitualPanel(contentRect: frame)
     window.title = "Threshold"
     window.backgroundColor = .black
     window.isOpaque = true
@@ -527,6 +541,29 @@ enum WindowPresentation {
     sourceWindow.orderOut(nil)
     ritualWindow = window
     return window
+  }
+
+  static func makeRitualPanel(contentRect: NSRect) -> NSPanel {
+    let panel = RitualPanel(
+      contentRect: contentRect,
+      styleMask: [.borderless, .nonactivatingPanel],
+      backing: .buffered,
+      defer: false
+    )
+    configureForImmersivePresentation(panel)
+    return panel
+  }
+
+  static func configureForImmersivePresentation(_ window: NSWindow) {
+    window.styleMask = [.borderless, .nonactivatingPanel]
+    if let panel = window as? NSPanel {
+      panel.isFloatingPanel = true
+      panel.hidesOnDeactivate = false
+    }
+    window.level = .screenSaver
+    window.collectionBehavior = overlayCollectionBehavior
+    window.isMovable = false
+    window.hasShadow = false
   }
 
   private static func coverSecondaryScreens(except covered: NSScreen) {
