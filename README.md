@@ -1,8 +1,8 @@
 # Threshold for macOS
 
-Threshold is a native, full-bleed SwiftUI lock-screen ritual for macOS. Knock the wooden door rings, trace a configurable formation, or open a steel vault with a locally configured ritual code. It does not collect system credentials or replace macOS authentication.
+Threshold is a native, full-bleed SwiftUI lock-screen ritual for macOS. Watch a living solar atlas and double-click its sun, knock the wooden-door rings, trace a configurable formation, or open a steel vault with a locally configured ritual code. It does not collect system credentials or replace macOS authentication.
 
-Threshold 是一个全屏铺底的原生 SwiftUI macOS 锁屏仪式应用：敲击木门门环、沿阵法轨迹充能，或输入本地配置的仪式密码打开钢制保险库。它不会收集系统密码，也不会替换 macOS 系统认证。
+Threshold 是一个全屏铺底的原生 SwiftUI macOS 锁屏仪式应用：观看动态太阳系并双击太阳、敲击木门门环、沿阵法轨迹充能，或输入本地配置的仪式密码打开钢制保险库。它不会收集系统密码，也不会替换 macOS 系统认证。
 
 ## Run / 运行
 
@@ -18,6 +18,10 @@ swift run LockScreen
 # Development preview without automatic fullscreen.
 # 使用窗口化开发预览。
 swift run LockScreen --windowed
+
+# Open Solar Atlas directly; it is also the default theme.
+# 直接打开 Solar Atlas；它也是默认主题。
+swift run LockScreen --windowed --solar
 
 # Open the formation theme directly in a windowed preview.
 # 直接以窗口模式预览阵法主题。
@@ -76,9 +80,10 @@ TCC 权限连续性。可通过 `APPLE_SIGNING_IDENTITY` 指定其他证书；�
 
 ## Controls / 操作
 
-- Choose `Wooden Door`, `Formation Gate`, or `Cipher Vault` in the upper-left corner. / 在左上角选择木门、阵法门或密码箱。
-- On `Wooden Door`, knock either brass ring three times. / 在 `Wooden Door` 中，敲击任意黄铜门环三次。
-- On `Formation Gate`, choose `Circle`, `Infinity`, or `Triangle`, then drag along the glowing track to charge it. Press `Return` for the keyboard-accessible channel action. / 在 `Formation Gate` 中选择 `Circle`、`Infinity` 或 `Triangle`，然后沿发光轨迹拖动充能；也可按 `Return` 使用键盘触发。
+- Choose `Solar Atlas`, `Five-Phase Formation`, `Wooden Door`, or `Cipher Vault` in the upper-left corner. / 在左上角选择太阳星图、五行阵法、木门或密码箱。
+- On `Solar Atlas`, double-click the sun. VoiceOver users can activate the named sun button once. / 在 `Solar Atlas` 中双击太阳；VoiceOver 用户可直接激活已命名的太阳按钮。
+- On `Wooden Door`, knock either brass ring three times. / 在 `Wooden Door` 中敲击任意黄铜门环三次。
+- On `Five-Phase Formation`, choose `Circle`, `Infinity`, or `Triangle`, then drag along the glowing track to charge it. Press `Return` for the keyboard-accessible channel action. / 在 `Five-Phase Formation` 中选择 `Circle`、`Infinity` 或 `Triangle`，然后沿发光轨迹拖动充能；也可按 `Return` 使用键盘触发。
 - On `Cipher Vault`, enter the configured code with the keyboard or keypad, then press `Return` or the unlock key. The default is `1024`; this is only an app ritual code, never your macOS password. / 在 `Cipher Vault` 中使用键盘或数字键盘输入配置密码，再按 `Return` 或开锁键。默认值为 `1024`；它只是应用仪式密码，绝不能使用 macOS 系统密码。
 - After a successful ritual, the doors finish opening, the app hides immediately, and the previous workspace becomes active without an intermediate window. / 仪式成功后，门完成开启，应用立即隐藏并激活之前的工作页面，不再出现中间窗口。
 - Press `⇧⌘F` or use the upper-right button to toggle immersive/windowed mode. / 按 `⇧⌘F` 或点击右上角按钮切换沉浸/窗口模式。

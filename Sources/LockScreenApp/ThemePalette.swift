@@ -10,6 +10,16 @@ struct ThemePalette {
   let primaryText: Color
   let secondaryText: Color
 
+  static let solar = ThemePalette(
+    backdrop: Color(red: 0.006, green: 0.009, blue: 0.025),
+    haze: Color(red: 0.07, green: 0.12, blue: 0.25),
+    accent: Color(red: 1, green: 0.68, blue: 0.22),
+    accentSoft: Color(red: 0.58, green: 0.2, blue: 0.055),
+    detail: Color(red: 0.64, green: 0.78, blue: 0.95),
+    primaryText: Color(red: 0.96, green: 0.97, blue: 1),
+    secondaryText: Color(red: 0.59, green: 0.68, blue: 0.82)
+  )
+
   static let wood = ThemePalette(
     backdrop: Color(red: 0.035, green: 0.027, blue: 0.022),
     haze: Color(red: 0.27, green: 0.12, blue: 0.045),
@@ -44,6 +54,8 @@ struct ThemePalette {
 extension DoorTheme {
   var palette: ThemePalette {
     switch self {
+    case .solar:
+      .solar
     case .wood:
       .wood
     case .formation:

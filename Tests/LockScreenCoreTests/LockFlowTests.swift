@@ -3,16 +3,43 @@ import XCTest
 @testable import LockScreenCore
 
 final class LockFlowTests: XCTestCase {
-  func testDefaultFlowStartsWithFivePhasesFormation() {
+  func testDefaultFlowStartsWithSolarAtlas() {
     let flow = LockFlow()
 
-    XCTAssertEqual(flow.theme, .formation)
+    XCTAssertEqual(flow.theme, .solar)
     XCTAssertEqual(flow.formationTrajectory, .circle)
   }
 
-  func testThemeAndFormationOrderingPrioritizesFivePhasesThenBaguaThenThunder() {
-    XCTAssertEqual(Array(DoorTheme.allCases.prefix(2)), [.formation, .wood])
+  func testGalleryOrderingStartsWithSolarAtlasThenThreeDistinctRituals() {
+    XCTAssertEqual(DoorTheme.allCases, [.solar, .formation, .wood, .vault])
     XCTAssertEqual(FormationTrajectory.allCases, [.circle, .infinity, .triangle])
+  }
+
+  func testWoodDoorAndThunderFormationKeepDistinctLabels() {
+    XCTAssertEqual(DoorTheme.wood.title, "Wooden Door")
+    XCTAssertEqual(DoorTheme.wood.subtitle, "Oak · Brass · Ember")
+    XCTAssertEqual(FormationTrajectory.triangle.title, "Thunder Seal")
+  }
+
+  func testSolarActivationStartsUnlocking() {
+    var flow = LockFlow(theme: .solar)
+
+    XCTAssertEqual(flow.activateSolarSystem(), .completed)
+    XCTAssertEqual(flow.phase, .unlocking)
+  }
+
+  func testSolarActivationIsIgnoredForOtherThemes() {
+    var flow = LockFlow(theme: .formation)
+
+    XCTAssertEqual(flow.activateSolarSystem(), .ignored)
+    XCTAssertEqual(flow.phase, .awaitingSequence)
+  }
+
+  func testRuneInputIsIgnoredForSolarAtlas() {
+    var flow = LockFlow(theme: .solar)
+
+    XCTAssertEqual(flow.chooseRune(.sun), .ignored)
+    XCTAssertEqual(flow.phase, .awaitingSequence)
   }
 
   func testConfiguredVaultPasscodeStartsUnlocking() {

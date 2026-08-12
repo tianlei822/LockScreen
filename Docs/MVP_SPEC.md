@@ -6,7 +6,8 @@ Build a native macOS experience that turns locking into a short, cinematic ritua
 
 The user can:
 
-- switch between a tactile wooden door, a living formation gate, and a steel cipher vault;
+- switch between a living solar atlas, a tactile wooden door, a five-phase formation, and a steel cipher vault;
+- see all eight planets move on individual elliptical orbits and double-click the sun to unlock;
 - experience the selected door as a full-bleed scene that covers the entire display rather than a centered card;
 - see the formation gate continuously rotate and pulse;
 - knock either of two wooden door rings three times to unlock the wooden door;
@@ -66,7 +67,7 @@ Names use `UpperCamelCase` for types and `lowerCamelCase` for values. Layout use
 - Verify rejected, partial, and activating formation traces for every configurable trajectory.
 - Verify theme selection and reset behavior.
 - Run `swift test` and `swift build` after meaningful increments.
-- Launch the final executable and inspect both themes, keyboard controls, puzzle feedback, and the unlock animation on the local Mac.
+- Launch the final executable and inspect all four themes, keyboard controls, puzzle feedback, and the unlock animation on the local Mac.
 
 ## Boundaries
 
@@ -78,7 +79,8 @@ Names use `UpperCamelCase` for types and `lowerCamelCase` for values. Layout use
 
 - `swift build` succeeds on the local Mac.
 - `swift test` passes tests covering all puzzle and lock-flow transitions.
-- The app offers `Wooden Door`, `Formation Gate`, and `Cipher Vault` themes.
+- The app offers `Solar Atlas`, `Five-Phase Formation`, `Wooden Door`, and `Cipher Vault` themes.
+- `Solar Atlas` renders eight continuously orbiting planets and unlocks only through the sun interaction while sealed.
 - The door artwork extends edge-to-edge across the active display without a surrounding card frame.
 - The formation gate visibly changes over time through rotation and pulse effects.
 - Either wooden door ring opens the door after exactly three knocks.

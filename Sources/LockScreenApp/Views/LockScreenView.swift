@@ -11,7 +11,7 @@ struct LockScreenView: View {
   private let backgroundMode: Bool
 
   init(
-    initialTheme: DoorTheme = .formation, vaultPasscode: String = "1024",
+    initialTheme: DoorTheme = .solar, vaultPasscode: String = "1024",
     backgroundMode: Bool = false
   ) {
     self.backgroundMode = backgroundMode
@@ -28,7 +28,8 @@ struct LockScreenView: View {
           phase: flow.phase,
           formationEnergy: flow.formationEnergy,
           formationTrajectory: flow.formationTrajectory,
-          woodKnockCount: flow.woodKnockCount
+          woodKnockCount: flow.woodKnockCount,
+          onSolarActivate: activateSolarSystem
         )
         .frame(width: proxy.size.width, height: proxy.size.height)
         .ignoresSafeArea()
@@ -62,6 +63,8 @@ struct LockScreenView: View {
           Spacer(minLength: 24)
 
           switch flow.theme {
+          case .solar:
+            EmptyView()
           case .wood:
             WoodDoorRingView(knockCount: flow.woodKnockCount, onKnock: knockWoodDoor)
               .ignoresSafeArea()
@@ -140,10 +143,6 @@ struct LockScreenView: View {
           .help("Toggle immersive mode (⇧⌘F)")
         }
       }
-      .opacity(controlsVisible ? 1 : 0)
-      .offset(y: controlsVisible ? 0 : -6)
-      .allowsHitTesting(controlsVisible)
-      .animation(.easeOut(duration: 0.45), value: controlsVisible)
     }
     .frame(maxWidth: .infinity)
   }
@@ -154,18 +153,40 @@ struct LockScreenView: View {
         Button {
           flow.selectTheme(theme)
         } label: {
-          if theme == flow.theme {
-            Label(theme.title, systemImage: "checkmark")
-          } else {
-            Text(theme.title)
-          }
+          Label(
+            theme.title,
+            systemImage: theme == flow.theme ? "checkmark" : theme.symbolName
+          )
         }
         .accessibilityLabel("Use \(theme.title) theme")
       }
     } label: {
-      Label("Choose door theme", systemImage: "paintpalette")
-        .labelStyle(.iconOnly)
-        .frame(width: 36, height: 30)
+      HStack(spacing: 10) {
+        Image(systemName: flow.theme.symbolName)
+          .font(.system(size: 15, weight: .medium))
+          .frame(width: 22)
+
+        VStack(alignment: .leading, spacing: 2) {
+          Text(flow.theme.title.uppercased())
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .tracking(1.3)
+          Text(flow.theme.subtitle)
+            .font(.system(size: 8, weight: .medium, design: .monospaced))
+            .tracking(0.5)
+            .foregroundStyle(palette.secondaryText)
+        }
+
+        Image(systemName: "chevron.down")
+          .font(.system(size: 8, weight: .bold))
+          .opacity(0.55)
+      }
+      .padding(.horizontal, 12)
+      .frame(height: 42)
+      .background(.black.opacity(0.24), in: Capsule())
+      .overlay {
+        Capsule()
+          .stroke(palette.detail.opacity(0.24), lineWidth: 0.8)
+      }
     }
     .menuStyle(.borderlessButton)
     .menuIndicator(.hidden)
@@ -177,6 +198,12 @@ struct LockScreenView: View {
 
   private func knockWoodDoor() {
     guard flow.knockWoodDoor() == .completed else { return }
+
+    beginUnlockSequence()
+  }
+
+  private func activateSolarSystem() {
+    guard flow.activateSolarSystem() == .completed else { return }
 
     beginUnlockSequence()
   }
@@ -204,11 +231,14 @@ struct LockScreenView: View {
   private func beginUnlockSequence() {
     controlsVisibilityTask?.cancel()
     Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(1_450))
+      try? await Task.sleep(for: .milliseconds(1_400))
       guard flow.phase == .unlocking else { return }
       flow.finishUnlockAnimation()
+
+      try? await Task.sleep(for: .milliseconds(180))
+      guard flow.phase == .open else { return }
       flow.finishReveal()
-      returnToDesktop()
+      await returnToDesktop()
     }
   }
 
@@ -236,11 +266,15 @@ struct LockScreenView: View {
   }
 
   @MainActor
-  private func returnToDesktop() {
+  private func returnToDesktop() async {
+    let ritualWindow = WindowPresentation.mainRitualWindow()
+    await WindowPresentation.fadeOut(ritualWindow)
+
     if backgroundMode {
-      // Re-seal the door and lurk until the next ⌘L instead of quitting.
+      // Re-seal only after the faded window is invisible, then lurk until the
+      // next ⌘L instead of flashing the sealed artwork during the retreat.
       flow.reset()
-      WindowPresentation.retreatToBackground(WindowPresentation.mainRitualWindow())
+      WindowPresentation.retreatToBackground(ritualWindow)
       return
     }
 
@@ -253,5 +287,20 @@ struct LockScreenView: View {
   private func refreshImmersiveState() {
     guard let window = WindowPresentation.mainRitualWindow() else { return }
     isImmersive = WindowPresentation.isImmersive(window)
+  }
+}
+
+extension DoorTheme {
+  fileprivate var symbolName: String {
+    switch self {
+    case .solar:
+      "sun.max.fill"
+    case .formation:
+      "seal.fill"
+    case .wood:
+      "door.left.hand.closed"
+    case .vault:
+      "lock.square.fill"
+    }
   }
 }

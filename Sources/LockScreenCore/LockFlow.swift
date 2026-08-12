@@ -1,4 +1,5 @@
 public enum DoorTheme: String, CaseIterable, Identifiable, Sendable {
+  case solar
   case formation
   case wood
   case vault
@@ -7,10 +8,12 @@ public enum DoorTheme: String, CaseIterable, Identifiable, Sendable {
 
   public var title: String {
     switch self {
+    case .solar:
+      "Solar Atlas"
     case .wood:
       "Wooden Door"
     case .formation:
-      "Formation Gate"
+      "Five-Phase Formation"
     case .vault:
       "Cipher Vault"
     }
@@ -18,10 +21,12 @@ public enum DoorTheme: String, CaseIterable, Identifiable, Sendable {
 
   public var subtitle: String {
     switch self {
+    case .solar:
+      "Orbit · Light · Helios"
     case .wood:
       "Oak · Brass · Ember"
     case .formation:
-      "Orbit · Rune · Aether"
+      "Cycle · Trace · Aether"
     case .vault:
       "Steel · Code · Relay"
     }
@@ -85,6 +90,11 @@ public enum WoodKnockResult: Equatable, Sendable {
   case ignored
 }
 
+public enum SolarActivationResult: Equatable, Sendable {
+  case completed
+  case ignored
+}
+
 public enum FormationTraceResult: Equatable, Sendable {
   case charged(energy: Double)
   case rejected
@@ -119,16 +129,16 @@ public struct LockFlow: Equatable, Sendable {
 
   public var requiredSequence: [Rune] {
     switch theme {
+    case .solar, .vault:
+      []
     case .wood:
       [.sun, .river, .mountain]
     case .formation:
       [.moon, .mountain, .sun]
-    case .vault:
-      []
     }
   }
 
-  public init(theme: DoorTheme = .formation, vaultPasscode: String = "1024") {
+  public init(theme: DoorTheme = .solar, vaultPasscode: String = "1024") {
     self.theme = theme
     self.vaultPasscode = vaultPasscode
     phase = .awaitingSequence
@@ -141,7 +151,7 @@ public struct LockFlow: Equatable, Sendable {
 
   @discardableResult
   public mutating func chooseRune(_ rune: Rune) -> PuzzleMove {
-    guard theme != .vault, phase == .awaitingSequence else {
+    guard !requiredSequence.isEmpty, phase == .awaitingSequence else {
       return .ignored
     }
 
@@ -161,6 +171,14 @@ public struct LockFlow: Equatable, Sendable {
     let move = PuzzleMove.advanced(current: progress, total: requiredSequence.count)
     lastMove = move
     return move
+  }
+
+  @discardableResult
+  public mutating func activateSolarSystem() -> SolarActivationResult {
+    guard theme == .solar, phase == .awaitingSequence else { return .ignored }
+
+    phase = .unlocking
+    return .completed
   }
 
   public mutating func selectTheme(_ theme: DoorTheme) {

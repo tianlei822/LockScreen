@@ -1,5 +1,10 @@
 # LockScreen MVP Implementation Plan
 
+- [x] Expand Threshold into a four-page lock-screen gallery.
+  - Acceptance: Solar Atlas is the default, shows eight animated planets, and unlocks by double-clicking the sun; the formation, wooden-door, and vault rituals remain selectable and distinct.
+  - Verify: core flow tests, release build, signed local bundle, and runtime inspection of all four themes.
+  - Files: `Docs/LOCK_SCREEN_GALLERY_PLAN.md`, `Sources/LockScreenCore/LockFlow.swift`, `Sources/LockScreenApp/Views/SolarSystemArtwork.swift`, `Sources/LockScreenApp/Views/LockScreenView.swift`.
+
 - [x] Build the package skeleton and test-drive the deterministic puzzle/state model.
   - Acceptance: correct, wrong, reset, and theme-change transitions are covered.
   - Verify: `swift test`.

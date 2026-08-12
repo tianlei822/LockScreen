@@ -8,9 +8,11 @@ enum AppConfiguration {
 
   static var initialTheme: DoorTheme {
     let arguments = ProcessInfo.processInfo.arguments
+    if arguments.contains("--solar") { return .solar }
     if arguments.contains("--vault") { return .vault }
     if arguments.contains("--wood") { return .wood }
-    return .formation
+    if arguments.contains("--formation") { return .formation }
+    return .solar
   }
 
   static var vaultPasscode: String {
@@ -349,6 +351,7 @@ enum WindowPresentation {
     guard let screen = window.screen ?? NSScreen.main else { return }
 
     renderActivity.present()
+    restoreWindowOpacity(window)
 
     window.level = .screenSaver
     window.collectionBehavior = overlayCollectionBehavior
@@ -425,14 +428,30 @@ enum WindowPresentation {
 
     window?.level = .normal
     window?.orderOut(nil)
+    window?.alphaValue = 1
     NSApp.setActivationPolicy(.accessory)
     NSApp.hide(nil)
+  }
+
+  static func fadeOut(_ window: NSWindow?) async {
+    guard let window else { return }
+
+    await NSAnimationContext.runAnimationGroup { context in
+      context.duration = 0.28
+      context.allowsImplicitAnimation = true
+      window.animator().alphaValue = 0
+    }
+  }
+
+  static func restoreWindowOpacity(_ window: NSWindow) {
+    window.alphaValue = 1
   }
 
   private static func enterWindowed(_ window: NSWindow) {
     guard let screen = window.screen ?? NSScreen.main else { return }
 
     renderActivity.present()
+    restoreWindowOpacity(window)
 
     coverageReassertionTask?.cancel()
     dismissScreenCovers()

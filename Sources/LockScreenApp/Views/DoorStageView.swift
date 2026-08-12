@@ -12,6 +12,7 @@ struct DoorStageView: View {
   let formationEnergy: Double
   let formationTrajectory: FormationTrajectory
   let woodKnockCount: Int
+  let onSolarActivate: () -> Void
 
   @State private var rendersSplitDoors = false
   @State private var splitDoorsOpen = false
@@ -25,7 +26,9 @@ struct DoorStageView: View {
       ZStack {
         PortalRevealView(theme: theme, isOpen: isOpen)
 
-        if rendersSplitDoors {
+        if theme == .solar {
+          SolarSystemArtwork(isActivated: isOpen, onActivate: onSolarActivate)
+        } else if rendersSplitDoors {
           HStack(spacing: 1) {
             leaf(side: .left, fullSize: size)
               .rotation3DEffect(
@@ -92,11 +95,17 @@ struct DoorStageView: View {
       }
     }
     .animation(.easeInOut(duration: 1.45), value: isOpen)
-    .accessibilityElement(children: .ignore)
+    .accessibilityElement(children: theme == .solar ? .contain : .ignore)
     .accessibilityLabel("\(theme.title), \(isOpen ? "open" : "sealed")")
   }
 
   private func prepareDoorPresentation(isOpen: Bool) {
+    guard theme != .solar else {
+      splitDoorsOpen = false
+      rendersSplitDoors = false
+      return
+    }
+
     guard isOpen else {
       splitDoorsOpen = false
       rendersSplitDoors = false
@@ -136,6 +145,8 @@ private struct DoorArtworkView: View {
   @ViewBuilder
   var body: some View {
     switch theme {
+    case .solar:
+      Color.black
     case .wood:
       WoodenDoorArtwork(knockCount: woodKnockCount)
     case .formation:
@@ -206,6 +217,7 @@ private struct PortalRevealView: View {
           .foregroundStyle(palette.primaryText)
           .opacity(isOpen ? 1 : 0.35)
           .scaleEffect(isOpen ? 1 : 0.82)
+          .accessibilityHidden(!isOpen)
         }
       }
     }
@@ -213,6 +225,8 @@ private struct PortalRevealView: View {
 
   private var portalSymbol: String {
     switch theme {
+    case .solar:
+      "☉"
     case .wood:
       "✦"
     case .formation:
