@@ -4,8 +4,8 @@ import SwiftUI
 struct WoodDoorOrnamentLayer: View {
   let knockCount: Int
 
-  private let soot = Color(red: 0.055, green: 0.022, blue: 0.012)
-  private let bronze = Color(red: 0.72, green: 0.48, blue: 0.19)
+  private let soot = Color(red: 0.075, green: 0.031, blue: 0.016)
+  private let bronze = Color(red: 0.8, green: 0.57, blue: 0.25)
   private let ember = Color(red: 1, green: 0.48, blue: 0.12)
 
   var body: some View {

@@ -3,10 +3,10 @@ import SwiftUI
 struct WoodenDoorArtwork: View {
   let knockCount: Int
 
-  private let darkWood = Color(red: 0.105, green: 0.044, blue: 0.017)
-  private let warmWood = Color(red: 0.275, green: 0.115, blue: 0.036)
-  private let edgeWood = Color(red: 0.034, green: 0.014, blue: 0.007)
-  private let brass = Color(red: 0.72, green: 0.49, blue: 0.2)
+  private let darkWood = Color(red: 0.155, green: 0.07, blue: 0.026)
+  private let warmWood = Color(red: 0.36, green: 0.16, blue: 0.055)
+  private let edgeWood = Color(red: 0.055, green: 0.022, blue: 0.01)
+  private let brass = Color(red: 0.8, green: 0.57, blue: 0.25)
 
   @State private var rippleProgress = 1.0
 
@@ -226,13 +226,13 @@ struct WoodenDoorArtwork: View {
   private func plankColors(index: Int) -> [Color] {
     switch index % 4 {
     case 0:
-      [darkWood, Color(red: 0.25, green: 0.095, blue: 0.028), edgeWood]
+      [darkWood, Color(red: 0.32, green: 0.14, blue: 0.045), edgeWood]
     case 1:
-      [Color(red: 0.18, green: 0.07, blue: 0.022), warmWood, darkWood]
+      [Color(red: 0.235, green: 0.105, blue: 0.035), warmWood, darkWood]
     case 2:
-      [Color(red: 0.22, green: 0.085, blue: 0.027), darkWood, warmWood.opacity(0.78)]
+      [Color(red: 0.29, green: 0.125, blue: 0.043), darkWood, warmWood.opacity(0.82)]
     default:
-      [darkWood, Color(red: 0.205, green: 0.075, blue: 0.022), edgeWood]
+      [darkWood, Color(red: 0.255, green: 0.105, blue: 0.034), edgeWood]
     }
   }
 
@@ -415,8 +415,8 @@ struct WoodenDoorArtwork: View {
     ZStack {
       RadialGradient(
         colors: [
-          Color(red: 0.9, green: 0.56, blue: 0.24).opacity(0.12),
-          Color(red: 0.42, green: 0.17, blue: 0.05).opacity(0.035),
+          Color(red: 0.94, green: 0.62, blue: 0.28).opacity(0.16),
+          Color(red: 0.5, green: 0.22, blue: 0.07).opacity(0.055),
           .clear,
         ],
         center: UnitPoint(x: 0.34, y: 0.28),
@@ -426,17 +426,17 @@ struct WoodenDoorArtwork: View {
 
       LinearGradient(
         colors: [
-          Color.black.opacity(0.34),
+          Color.black.opacity(0.26),
           .clear,
           .clear,
-          Color.black.opacity(0.3),
+          Color.black.opacity(0.24),
         ],
         startPoint: .leading,
         endPoint: .trailing
       )
 
       LinearGradient(
-        colors: [Color.white.opacity(0.035), .clear, Color.black.opacity(0.2)],
+        colors: [Color.white.opacity(0.05), .clear, Color.black.opacity(0.15)],
         startPoint: .top,
         endPoint: .bottom
       )

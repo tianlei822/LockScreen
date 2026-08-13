@@ -6,15 +6,19 @@ struct LockScreenView: View {
   @State private var flow: LockFlow
   @State private var controlsVisible = true
   @State private var controlsVisibilityTask: Task<Void, Never>?
+  @State private var isThemeSelectorHovered = false
+  @State private var isPresentationButtonHovered = false
   @State private var isImmersive = false
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
   private let backgroundMode: Bool
+  private let vaultPasscodeStore: VaultPasscodeStore
 
   init(
     initialTheme: DoorTheme = .solar, vaultPasscode: String = "1024",
-    backgroundMode: Bool = false
+    backgroundMode: Bool = false, vaultPasscodeStore: VaultPasscodeStore = VaultPasscodeStore()
   ) {
     self.backgroundMode = backgroundMode
+    self.vaultPasscodeStore = vaultPasscodeStore
     _flow = State(initialValue: LockFlow(theme: initialTheme, vaultPasscode: vaultPasscode))
   }
 
@@ -71,11 +75,14 @@ struct LockScreenView: View {
           case .formation:
             EmptyView()
           case .vault:
-            VaultPasscodeView(onSubmit: submitVaultPasscode)
+            VaultPasscodeView(
+              onSubmit: submitVaultPasscode,
+              onUpdatePasscode: updateVaultPasscode
+            )
           }
         }
         .padding(.horizontal, max(24, proxy.size.width * 0.045))
-        .padding(.top, 24)
+        .padding(.top, isImmersive ? 24 : 48)
         .padding(.bottom, 28)
         .opacity(flow.phase == .awaitingSequence ? 1 : 0)
         .allowsHitTesting(flow.phase == .awaitingSequence)
@@ -85,6 +92,10 @@ struct LockScreenView: View {
         if case .active = phase {
           revealControls()
         }
+      }
+      .onKeyPress(.tab) {
+        revealControls()
+        return .ignored
       }
     }
     .preferredColorScheme(.dark)
@@ -127,21 +138,40 @@ struct LockScreenView: View {
 
         Spacer()
 
-        if !isImmersive {
-          Button {
-            WindowPresentation.toggle(NSApp.keyWindow ?? NSApp.windows.first)
-            refreshImmersiveState()
-          } label: {
-            Label("Fullscreen", systemImage: "arrow.up.left.and.arrow.down.right")
-              .labelStyle(.iconOnly)
-              .frame(width: 36, height: 30)
+        Button {
+          WindowPresentation.toggle(NSApp.keyWindow ?? NSApp.windows.first)
+          refreshImmersiveState()
+        } label: {
+          Label(
+            isImmersive ? "Exit Immersive Mode" : "Enter Immersive Mode",
+            systemImage: isImmersive
+              ? "arrow.down.right.and.arrow.up.left"
+              : "arrow.up.left.and.arrow.down.right"
+          )
+          .labelStyle(.iconOnly)
+          .font(.system(size: 13, weight: .semibold))
+          .frame(width: 36, height: 36)
+          .background(
+            .black.opacity(isPresentationButtonHovered ? 0.42 : 0.26),
+            in: RoundedRectangle(cornerRadius: 8)
+          )
+          .overlay {
+            RoundedRectangle(cornerRadius: 8)
+              .stroke(
+                palette.detail.opacity(isPresentationButtonHovered ? 0.42 : 0.24),
+                lineWidth: 0.8
+              )
           }
-          .buttonStyle(.plain)
-          .foregroundStyle(palette.secondaryText)
-          .keyboardShortcut("f", modifiers: [.command, .shift])
-          .accessibilityLabel("Toggle immersive mode")
-          .help("Toggle immersive mode (⇧⌘F)")
         }
+        .buttonStyle(.plain)
+        .foregroundStyle(
+          isPresentationButtonHovered ? palette.primaryText : palette.secondaryText
+        )
+        .keyboardShortcut("f", modifiers: [.command, .shift])
+        .accessibilityLabel(isImmersive ? "Exit immersive mode" : "Enter immersive mode")
+        .help(isImmersive ? "Exit immersive mode (⇧⌘F)" : "Enter immersive mode (⇧⌘F)")
+        .onHover { isPresentationButtonHovered = $0 }
+        .animation(.easeOut(duration: 0.18), value: isPresentationButtonHovered)
       }
     }
     .frame(maxWidth: .infinity)
@@ -165,35 +195,44 @@ struct LockScreenView: View {
         Image(systemName: flow.theme.symbolName)
           .font(.system(size: 15, weight: .medium))
           .frame(width: 22)
+          .foregroundStyle(palette.primaryText.opacity(0.88))
 
         VStack(alignment: .leading, spacing: 2) {
           Text(flow.theme.title.uppercased())
             .font(.system(size: 10, weight: .semibold, design: .monospaced))
             .tracking(1.3)
+            .foregroundStyle(palette.primaryText.opacity(0.92))
           Text(flow.theme.subtitle)
-            .font(.system(size: 8, weight: .medium, design: .monospaced))
+            .font(.system(size: 9, weight: .medium, design: .monospaced))
             .tracking(0.5)
             .foregroundStyle(palette.secondaryText)
         }
 
         Image(systemName: "chevron.down")
           .font(.system(size: 8, weight: .bold))
-          .opacity(0.55)
+          .foregroundStyle(palette.secondaryText.opacity(0.72))
       }
-      .padding(.horizontal, 12)
-      .frame(height: 42)
-      .background(.black.opacity(0.24), in: Capsule())
+      .padding(.horizontal, 14)
+      .frame(height: 44)
+      .background(
+        .black.opacity(isThemeSelectorHovered ? 0.4 : 0.26),
+        in: RoundedRectangle(cornerRadius: 8)
+      )
       .overlay {
-        Capsule()
-          .stroke(palette.detail.opacity(0.24), lineWidth: 0.8)
+        RoundedRectangle(cornerRadius: 8)
+          .stroke(
+            palette.detail.opacity(isThemeSelectorHovered ? 0.4 : 0.24),
+            lineWidth: 0.8
+          )
       }
     }
     .menuStyle(.borderlessButton)
     .menuIndicator(.hidden)
     .fixedSize()
-    .foregroundStyle(palette.secondaryText)
     .accessibilityLabel("Choose door theme; current theme is \(flow.theme.title)")
     .help("Choose door theme")
+    .onHover { isThemeSelectorHovered = $0 }
+    .animation(.easeOut(duration: 0.18), value: isThemeSelectorHovered)
   }
 
   private func knockWoodDoor() {
@@ -226,6 +265,11 @@ struct LockScreenView: View {
       beginUnlockSequence()
     }
     return result
+  }
+
+  private func updateVaultPasscode(_ passcode: String) -> Bool {
+    guard flow.updateVaultPasscode(passcode) else { return false }
+    return vaultPasscodeStore.save(passcode)
   }
 
   private func beginUnlockSequence() {

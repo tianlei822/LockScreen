@@ -67,6 +67,23 @@ final class LockFlowTests: XCTestCase {
     XCTAssertEqual(flow.phase, .awaitingSequence)
   }
 
+  func testVaultPasscodeCanBeUpdatedWhileTheVaultIsSealed() {
+    var flow = LockFlow(theme: .vault, vaultPasscode: "2580")
+
+    XCTAssertTrue(flow.updateVaultPasscode("7531"))
+    XCTAssertEqual(flow.submitVaultPasscode("2580"), .incorrect)
+    XCTAssertEqual(flow.submitVaultPasscode("7531"), .completed)
+  }
+
+  func testVaultPasscodeUpdateRejectsInvalidCodes() {
+    var flow = LockFlow(theme: .vault, vaultPasscode: "2580")
+
+    XCTAssertFalse(flow.updateVaultPasscode("123"))
+    XCTAssertFalse(flow.updateVaultPasscode("123456789"))
+    XCTAssertFalse(flow.updateVaultPasscode("25A0"))
+    XCTAssertEqual(flow.submitVaultPasscode("2580"), .completed)
+  }
+
   func testVaultPasscodeIsIgnoredForOtherThemes() {
     var flow = LockFlow(theme: .wood, vaultPasscode: "2580")
 

@@ -3,12 +3,14 @@ import SwiftUI
 
 struct VaultPasscodeView: View {
   let onSubmit: (String) -> VaultPasscodeResult
+  let onUpdatePasscode: (String) -> Bool
 
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
   @State private var passcode = ""
   @State private var status = "ENTER ACCESS CODE"
   @State private var isRejected = false
   @State private var isShaking = false
+  @State private var isShowingPasscodeSettings = false
   @FocusState private var isFocused: Bool
 
   private let amber = Color(red: 0.94, green: 0.61, blue: 0.18)
@@ -35,6 +37,23 @@ struct VaultPasscodeView: View {
               .foregroundStyle(Color.white.opacity(0.42))
           }
           Spacer()
+          Button {
+            isShowingPasscodeSettings = true
+          } label: {
+            Image(systemName: "gearshape")
+              .font(.system(size: 11, weight: .semibold))
+              .frame(width: 28, height: 26)
+              .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 4))
+              .overlay {
+                RoundedRectangle(cornerRadius: 4)
+                  .stroke(Color.white.opacity(0.1), lineWidth: 0.8)
+              }
+          }
+          .buttonStyle(.plain)
+          .foregroundStyle(Color.white.opacity(0.62))
+          .accessibilityLabel("Change Vault ritual code")
+          .help("Change the persistent Vault ritual code")
+
           Circle()
             .fill(isRejected ? Color.red : amber)
             .frame(width: 7, height: 7)
@@ -57,7 +76,7 @@ struct VaultPasscodeView: View {
           .onChange(of: passcode) { _, value in
             let digits = value.filter(\.isNumber)
             passcode = String(digits.prefix(8))
-            if isRejected, !passcode.isEmpty {
+            if isRejected || status == "CODE UPDATED", !passcode.isEmpty {
               isRejected = false
               status = "ENTER ACCESS CODE"
             }
@@ -109,6 +128,14 @@ struct VaultPasscodeView: View {
       }
       .onChange(of: ritualAnimationsPaused) { _, _ in
         resetForNextSession()
+      }
+    }
+    .sheet(isPresented: $isShowingPasscodeSettings) {
+      VaultPasscodeSettingsView(onSave: saveUpdatedPasscode)
+    }
+    .onChange(of: isShowingPasscodeSettings) { _, isShowing in
+      if !isShowing {
+        isFocused = true
       }
     }
   }
@@ -193,11 +220,21 @@ struct VaultPasscodeView: View {
     }
   }
 
+  private func saveUpdatedPasscode(_ updatedPasscode: String) -> Bool {
+    guard onUpdatePasscode(updatedPasscode) else { return false }
+
+    passcode.removeAll()
+    status = "CODE UPDATED"
+    isRejected = false
+    return true
+  }
+
   private func resetForNextSession() {
     passcode.removeAll()
     status = "ENTER ACCESS CODE"
     isRejected = false
     isShaking = false
+    isShowingPasscodeSettings = false
     isFocused = !ritualAnimationsPaused
   }
 

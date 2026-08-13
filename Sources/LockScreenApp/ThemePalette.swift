@@ -21,13 +21,13 @@ struct ThemePalette {
   )
 
   static let wood = ThemePalette(
-    backdrop: Color(red: 0.035, green: 0.027, blue: 0.022),
-    haze: Color(red: 0.27, green: 0.12, blue: 0.045),
-    accent: Color(red: 0.96, green: 0.58, blue: 0.19),
-    accentSoft: Color(red: 0.55, green: 0.24, blue: 0.075),
-    detail: Color(red: 0.82, green: 0.67, blue: 0.39),
+    backdrop: Color(red: 0.055, green: 0.032, blue: 0.02),
+    haze: Color(red: 0.34, green: 0.16, blue: 0.055),
+    accent: Color(red: 0.98, green: 0.64, blue: 0.24),
+    accentSoft: Color(red: 0.64, green: 0.29, blue: 0.09),
+    detail: Color(red: 0.88, green: 0.71, blue: 0.42),
     primaryText: Color(red: 0.97, green: 0.93, blue: 0.84),
-    secondaryText: Color(red: 0.71, green: 0.64, blue: 0.52)
+    secondaryText: Color(red: 0.78, green: 0.69, blue: 0.55)
   )
 
   static let formation = ThemePalette(

@@ -16,18 +16,25 @@ enum AppConfiguration {
   }
 
   static var vaultPasscode: String {
+    resolveVaultPasscode(
+      arguments: ProcessInfo.processInfo.arguments,
+      storedPasscode: VaultPasscodeStore().load()
+    )
+  }
+
+  static func resolveVaultPasscode(arguments: [String], storedPasscode: String) -> String {
     let prefix = "--passcode="
+    let fallback =
+      LockFlow.isValidVaultPasscode(storedPasscode)
+      ? storedPasscode : LockFlow.defaultVaultPasscode
     guard
-      let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) })
+      let argument = arguments.first(where: { $0.hasPrefix(prefix) })
     else {
-      return "1024"
+      return fallback
     }
 
     let passcode = String(argument.dropFirst(prefix.count))
-    guard (4...8).contains(passcode.count), passcode.allSatisfy(\.isNumber) else {
-      return "1024"
-    }
-    return passcode
+    return LockFlow.isValidVaultPasscode(passcode) ? passcode : fallback
   }
 }
 

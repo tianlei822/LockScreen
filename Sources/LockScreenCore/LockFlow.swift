@@ -118,6 +118,8 @@ public enum VaultPasscodeResult: Equatable, Sendable {
 }
 
 public struct LockFlow: Equatable, Sendable {
+  public static let defaultVaultPasscode = "1024"
+
   public private(set) var theme: DoorTheme
   public private(set) var phase: LockPhase
   public private(set) var progress: Int
@@ -125,7 +127,7 @@ public struct LockFlow: Equatable, Sendable {
   public private(set) var woodKnockCount: Int
   public private(set) var formationEnergy: Double
   public private(set) var formationTrajectory: FormationTrajectory
-  private let vaultPasscode: String
+  private var vaultPasscode: String
 
   public var requiredSequence: [Rune] {
     switch theme {
@@ -140,7 +142,8 @@ public struct LockFlow: Equatable, Sendable {
 
   public init(theme: DoorTheme = .solar, vaultPasscode: String = "1024") {
     self.theme = theme
-    self.vaultPasscode = vaultPasscode
+    self.vaultPasscode =
+      Self.isValidVaultPasscode(vaultPasscode) ? vaultPasscode : Self.defaultVaultPasscode
     phase = .awaitingSequence
     progress = 0
     lastMove = nil
@@ -238,6 +241,20 @@ public struct LockFlow: Equatable, Sendable {
 
     phase = .unlocking
     return .completed
+  }
+
+  public static func isValidVaultPasscode(_ passcode: String) -> Bool {
+    (4...8).contains(passcode.count) && passcode.allSatisfy(\.isNumber)
+  }
+
+  @discardableResult
+  public mutating func updateVaultPasscode(_ passcode: String) -> Bool {
+    guard theme == .vault, phase == .awaitingSequence,
+      Self.isValidVaultPasscode(passcode)
+    else { return false }
+
+    vaultPasscode = passcode
+    return true
   }
 
   public mutating func finishUnlockAnimation() {
