@@ -73,6 +73,39 @@ final class WindowPresentationTests: XCTestCase {
   }
 
   @MainActor
+  func testStatusItemAppearanceRefreshPreservesAppKitCell() throws {
+    let button = NSStatusBarButton(
+      frame: NSRect(x: 0, y: 0, width: 24, height: 24)
+    )
+    let cell = try XCTUnwrap(button.cell as? NSButtonCell)
+    let originalCell = button.cell
+    button.isTransparent = false
+    button.isBordered = true
+    cell.highlightsBy = [.changeBackgroundCellMask]
+    cell.showsStateBy = [.changeBackgroundCellMask]
+    cell.isHighlighted = true
+    button.state = .on
+
+    AppDelegate.configureTransparentStatusItemAppearance(button)
+
+    XCTAssertTrue(button.cell === originalCell)
+    XCTAssertTrue(button.isTransparent)
+    XCTAssertFalse(button.isBordered)
+    XCTAssertTrue(cell.highlightsBy.isEmpty)
+    XCTAssertTrue(cell.showsStateBy.isEmpty)
+    XCTAssertFalse(cell.isHighlighted)
+    XCTAssertEqual(button.state, .off)
+  }
+
+  @MainActor
+  func testStatusItemAppearanceRefreshContinuesAfterTheNextRunLoop() {
+    XCTAssertGreaterThan(AppDelegate.statusItemAppearanceRefreshDelays.count, 1)
+    XCTAssertTrue(
+      AppDelegate.statusItemAppearanceRefreshDelays.contains { $0 >= .seconds(1) }
+    )
+  }
+
+  @MainActor
   func testRestoringWindowOpacityPreparesItForTheNextPresentation() {
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),

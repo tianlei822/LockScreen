@@ -23,8 +23,15 @@ require_source 'buttonCell.isHighlighted = false'
 require_source 'button.action = #selector(showStatusMenu(_:))'
 require_source 'statusMenu.popUp(positioning: nil, at: .zero, in: sender)'
 require_source 'private func applyTransparentStatusItemAppearance'
-require_source 'DispatchQueue.main.async { [weak self, weak button] in'
-require_source 'self?.applyTransparentStatusItemAppearance(to: button)'
+require_source 'static let statusItemAppearanceRefreshDelays'
+require_source 'scheduleStatusItemAppearanceRefresh()'
+require_source 'try await Task.sleep(for: delay)'
+require_source 'Self.configureTransparentStatusItemAppearance(button)'
+
+if /usr/bin/grep -Eq '^[[:space:]]*button\.cell[[:space:]]*=' "$source_file"; then
+  echo 'do not replace the AppKit-managed status-bar button cell' >&2
+  exit 1
+fi
 
 if /usr/bin/grep -Eq '^[[:space:]]*item\.menu[[:space:]]*=' "$source_file"; then
   echo 'do not attach the menu through NSStatusItem.menu; it restores the dark highlight' >&2

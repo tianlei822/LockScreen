@@ -104,6 +104,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     NSWorkspace.activeSpaceDidChangeNotification,
   ]
 
+  /// Login can reconfigure the menu bar for several run-loop turns after this
+  /// LaunchAgent starts, so keep restoring transparency while it settles.
+  static let statusItemAppearanceRefreshDelays: [Duration] = [
+    .milliseconds(100), .milliseconds(400), .seconds(1), .seconds(2),
+  ]
+
   static func shouldTerminateAfterLastWindowClosed(
     backgroundMode: Bool,
     ritualIsImmersive: Bool
@@ -111,9 +117,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     !backgroundMode && !ritualIsImmersive
   }
 
+  static func configureTransparentStatusItemAppearance(_ button: NSStatusBarButton) {
+    button.isBordered = false
+    button.isTransparent = true
+    if let buttonCell = button.cell as? NSButtonCell {
+      buttonCell.highlightsBy = []
+      buttonCell.showsStateBy = []
+      buttonCell.isHighlighted = false
+    }
+    button.state = .off
+    button.highlight(false)
+    button.needsDisplay = true
+  }
+
   private var screenObserver: NSObjectProtocol?
   private var workspaceObservers: [NSObjectProtocol] = []
   private var statusItem: NSStatusItem?
+  private var statusItemAppearanceRefreshTask: Task<Void, Never>?
   private var statusMenu: NSMenu?
   private var hotKey: GlobalHotKey?
 
@@ -130,18 +150,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
       forName: NSApplication.didChangeScreenParametersNotification,
       object: nil,
       queue: .main
-    ) { _ in
-      Task { @MainActor in
+    ) { [weak self] _ in
+      Task { @MainActor [weak self] in
         WindowPresentation.refreshScreenCovers()
+        self?.scheduleStatusItemAppearanceRefresh()
       }
     }
 
     let workspaceCenter = NSWorkspace.shared.notificationCenter
     for name in Self.coverageRefreshNotifications {
       workspaceObservers.append(
-        workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { _ in
-          Task { @MainActor in
+        workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+          Task { @MainActor [weak self] in
             WindowPresentation.refreshScreenCovers()
+            self?.scheduleStatusItemAppearanceRefresh()
           }
         })
     }
@@ -205,6 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
   func applicationWillTerminate(_ notification: Notification) {
     IdleSuppression.end()
     hotKey?.unregister()
+    statusItemAppearanceRefreshTask?.cancel()
     if let screenObserver {
       NotificationCenter.default.removeObserver(screenObserver)
     }
@@ -256,12 +279,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
       button.setAccessibilityLabel("Threshold")
       applyTransparentStatusItemAppearance(to: button)
 
-      // NSStatusBar may update its button after the item is attached. Reapply
-      // on the next main-loop turn so that update cannot restore the backing.
-      DispatchQueue.main.async { [weak self, weak button] in
-        self?.applyTransparentStatusItemAppearance(to: button)
-      }
-
       NSLayoutConstraint.activate([
         imageView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
         imageView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
@@ -289,6 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     // detached without changing the menu's behavior.
     statusMenu = menu
     statusItem = item
+    scheduleStatusItemAppearanceRefresh()
   }
 
   @objc private func showStatusMenu(_ sender: NSStatusBarButton) {
@@ -309,16 +327,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
   private func applyTransparentStatusItemAppearance(to button: NSStatusBarButton? = nil) {
     guard let button = button ?? statusItem?.button else { return }
-    button.isBordered = false
-    button.isTransparent = true
-    if let buttonCell = button.cell as? NSButtonCell {
-      buttonCell.highlightsBy = []
-      buttonCell.showsStateBy = []
-      buttonCell.isHighlighted = false
+    Self.configureTransparentStatusItemAppearance(button)
+  }
+
+  private func scheduleStatusItemAppearanceRefresh() {
+    guard statusItem != nil else { return }
+
+    statusItemAppearanceRefreshTask?.cancel()
+    statusItemAppearanceRefreshTask = Task { @MainActor [weak self] in
+      for delay in Self.statusItemAppearanceRefreshDelays {
+        do {
+          try await Task.sleep(for: delay)
+        } catch {
+          return
+        }
+        self?.applyTransparentStatusItemAppearance()
+      }
     }
-    button.state = .off
-    button.highlight(false)
-    button.needsDisplay = true
   }
 
   @objc private func lockNowFromMenu() {
