@@ -31,7 +31,7 @@ struct SolarSystemArtwork: View {
           )
 
           ZStack {
-            SolarOrbitCanvas(time: time, center: center)
+            SolarOrbitCanvas(time: time, center: center, planetDepth: .behindSun)
               .opacity(max(0, 1 - exitProgress * 1.08))
               .scaleEffect(1 + exitProgress * 0.16, anchor: .center)
               .blur(radius: exitProgress * 13)
@@ -48,6 +48,12 @@ struct SolarSystemArtwork: View {
               onActivate: onActivate
             )
             .position(center)
+
+            SolarOrbitCanvas(time: time, center: center, planetDepth: .inFrontOfSun)
+              .opacity(max(0, 1 - exitProgress * 1.08))
+              .scaleEffect(1 + exitProgress * 0.16, anchor: .center)
+              .blur(radius: exitProgress * 13)
+              .allowsHitTesting(false)
           }
         }
         .opacity(isActivated && ritualMotionReduced ? 0 : 1)

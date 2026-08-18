@@ -3,15 +3,18 @@ import SwiftUI
 struct SolarOrbitCanvas: View {
   let time: TimeInterval
   let center: CGPoint
+  let planetDepth: SolarOrbitDepth
 
   var body: some View {
     Canvas(opaque: false, rendersAsynchronously: true) { context, size in
-      drawNebula(context: context, size: size)
-      drawStars(context: context, size: size)
-      drawMeteors(context: context, size: size)
-      drawOrbits(context: context, size: size)
-      drawBelts(context: context, size: size)
-      drawPlanets(context: context, size: size)
+      if planetDepth == .behindSun {
+        drawNebula(context: context, size: size)
+        drawStars(context: context, size: size)
+        drawMeteors(context: context, size: size)
+        drawOrbits(context: context, size: size)
+        drawBelts(context: context, size: size)
+      }
+      drawPlanets(context: context, size: size, depth: planetDepth)
     }
   }
 
@@ -363,13 +366,19 @@ struct SolarOrbitCanvas: View {
     }
   }
 
-  private func drawPlanets(context: GraphicsContext, size: CGSize) {
+  private func drawPlanets(
+    context: GraphicsContext,
+    size: CGSize,
+    depth: SolarOrbitDepth
+  ) {
     let unit = min(size.width, size.height)
-    let placements = SolarPlanet.all.map { planet in
+    let placements: [(planet: SolarPlanet, point: CGPoint)] = SolarPlanet.all.compactMap {
+      planet in
       let angle = time * planet.speed + planet.phase
+      guard SolarOrbitDepth(angle: angle) == depth else { return nil }
       return (planet, orbitPoint(radius: unit * planet.orbit, angle: angle))
     }
-    .sorted { $0.1.y < $1.1.y }
+    .sorted { $0.point.y < $1.point.y }
 
     for (planet, point) in placements {
       let radius = max(4, unit * planet.radius)
@@ -869,6 +878,15 @@ struct SolarOrbitCanvas: View {
 
   private func hash(_ value: Double) -> CGFloat {
     CGFloat(abs(sin(value * 12.9898) * 43_758.5453).truncatingRemainder(dividingBy: 1))
+  }
+}
+
+enum SolarOrbitDepth: Equatable {
+  case behindSun
+  case inFrontOfSun
+
+  init(angle: Double) {
+    self = sin(angle) > 0 ? .inFrontOfSun : .behindSun
   }
 }
 
