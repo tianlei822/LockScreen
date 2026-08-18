@@ -86,7 +86,7 @@ final class WindowPresentationTests: XCTestCase {
     cell.isHighlighted = true
     button.state = .on
 
-    AppDelegate.configureTransparentStatusItemAppearance(button)
+    StatusItemController.configureTransparentAppearance(button)
 
     XCTAssertTrue(button.cell === originalCell)
     XCTAssertTrue(button.isTransparent)
@@ -99,9 +99,9 @@ final class WindowPresentationTests: XCTestCase {
 
   @MainActor
   func testStatusItemAppearanceRefreshContinuesAfterTheNextRunLoop() {
-    XCTAssertGreaterThan(AppDelegate.statusItemAppearanceRefreshDelays.count, 1)
+    XCTAssertGreaterThan(StatusItemController.appearanceRefreshDelays.count, 1)
     XCTAssertTrue(
-      AppDelegate.statusItemAppearanceRefreshDelays.contains { $0 >= .seconds(1) }
+      StatusItemController.appearanceRefreshDelays.contains { $0 >= .seconds(1) }
     )
   }
 

@@ -7,7 +7,10 @@ import OSLog
 /// to us even while another app is frontmost.
 @MainActor
 final class GlobalHotKey {
-  private static let logger = Logger(subsystem: "com.tianlei.threshold", category: "HotKey")
+  private static let logger = Logger(
+    subsystem: ProductMetadata.bundleIdentifier,
+    category: "HotKey"
+  )
 
   private let keyCode: UInt32
   private let modifiers: UInt32
@@ -23,6 +26,10 @@ final class GlobalHotKey {
     self.keyCode = keyCode
     self.modifiers = modifiers
     self.action = action
+  }
+
+  convenience init(preset: GlobalHotKeyPreset, action: @escaping () -> Void) {
+    self.init(keyCode: preset.keyCode, modifiers: preset.modifiers, action: action)
   }
 
   @discardableResult
@@ -67,7 +74,7 @@ final class GlobalHotKey {
     )
     guard registerStatus == noErr else {
       Self.logger.error(
-        "Could not register Command-L (status: \(registerStatus, privacy: .public))"
+        "Could not register the global hot key (status: \(registerStatus, privacy: .public))"
       )
       if let handlerRef {
         RemoveEventHandler(handlerRef)
@@ -75,7 +82,7 @@ final class GlobalHotKey {
       }
       return false
     }
-    Self.logger.info("Registered Command-L global hot key")
+    Self.logger.info("Registered the global hot key")
     return true
   }
 

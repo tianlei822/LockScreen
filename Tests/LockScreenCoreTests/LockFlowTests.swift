@@ -15,12 +15,6 @@ final class LockFlowTests: XCTestCase {
     XCTAssertEqual(FormationTrajectory.allCases, [.circle, .infinity, .triangle])
   }
 
-  func testWoodDoorAndThunderFormationKeepDistinctLabels() {
-    XCTAssertEqual(DoorTheme.wood.title, "Wooden Door")
-    XCTAssertEqual(DoorTheme.wood.subtitle, "Oak · Brass · Ember")
-    XCTAssertEqual(FormationTrajectory.triangle.title, "Thunder Seal")
-  }
-
   func testSolarActivationStartsUnlocking() {
     var flow = LockFlow(theme: .solar)
 
@@ -32,14 +26,7 @@ final class LockFlowTests: XCTestCase {
     var flow = LockFlow(theme: .formation)
 
     XCTAssertEqual(flow.activateSolarSystem(), .ignored)
-    XCTAssertEqual(flow.phase, .awaitingSequence)
-  }
-
-  func testRuneInputIsIgnoredForSolarAtlas() {
-    var flow = LockFlow(theme: .solar)
-
-    XCTAssertEqual(flow.chooseRune(.sun), .ignored)
-    XCTAssertEqual(flow.phase, .awaitingSequence)
+    XCTAssertEqual(flow.phase, .sealed)
   }
 
   func testConfiguredVaultPasscodeStartsUnlocking() {
@@ -64,7 +51,7 @@ final class LockFlowTests: XCTestCase {
     var flow = LockFlow(theme: .vault, vaultPasscode: "2580")
 
     XCTAssertEqual(flow.submitVaultPasscode("1024"), .incorrect)
-    XCTAssertEqual(flow.phase, .awaitingSequence)
+    XCTAssertEqual(flow.phase, .sealed)
   }
 
   func testVaultPasscodeCanBeUpdatedWhileTheVaultIsSealed() {
@@ -84,11 +71,17 @@ final class LockFlowTests: XCTestCase {
     XCTAssertEqual(flow.submitVaultPasscode("2580"), .completed)
   }
 
+  func testVaultPasscodeUsesTheSameASCIIDigitsAsTheKeypadAndLaunchArguments() {
+    XCTAssertTrue(LockFlow.isValidVaultPasscode("01234567"))
+    XCTAssertFalse(LockFlow.isValidVaultPasscode("١٢٣٤"))
+    XCTAssertFalse(LockFlow.isValidVaultPasscode("１２３４"))
+  }
+
   func testVaultPasscodeIsIgnoredForOtherThemes() {
     var flow = LockFlow(theme: .wood, vaultPasscode: "2580")
 
     XCTAssertEqual(flow.submitVaultPasscode("2580"), .ignored)
-    XCTAssertEqual(flow.phase, .awaitingSequence)
+    XCTAssertEqual(flow.phase, .sealed)
   }
 
   func testThirdWoodKnockStartsUnlocking() {
@@ -96,7 +89,7 @@ final class LockFlowTests: XCTestCase {
 
     XCTAssertEqual(flow.knockWoodDoor(), .knocked(count: 1))
     XCTAssertEqual(flow.knockWoodDoor(), .knocked(count: 2))
-    XCTAssertEqual(flow.phase, .awaitingSequence)
+    XCTAssertEqual(flow.phase, .sealed)
 
     XCTAssertEqual(flow.knockWoodDoor(), .completed)
     XCTAssertEqual(flow.woodKnockCount, 3)
@@ -130,7 +123,7 @@ final class LockFlowTests: XCTestCase {
 
     XCTAssertEqual(flow.applyFormationTrace(score: 0.5), .charged(energy: 0.5))
     XCTAssertEqual(flow.formationEnergy, 0.5)
-    XCTAssertEqual(flow.phase, .awaitingSequence)
+    XCTAssertEqual(flow.phase, .sealed)
   }
 
   func testChangingFormationTrajectoryClearsCharge() {
@@ -143,48 +136,31 @@ final class LockFlowTests: XCTestCase {
     XCTAssertEqual(flow.formationEnergy, 0)
   }
 
-  func testCorrectSequenceStartsUnlocking() {
+  func testSelectingThemeResetsTransientRitualState() {
     var flow = LockFlow(theme: .wood)
-
-    let moves = flow.requiredSequence.map { flow.chooseRune($0) }
-
-    XCTAssertEqual(
-      moves.dropLast(), [.advanced(current: 1, total: 3), .advanced(current: 2, total: 3)])
-    XCTAssertEqual(moves.last, .completed)
-    XCTAssertEqual(flow.phase, .unlocking)
-    XCTAssertEqual(flow.progress, 3)
-  }
-
-  func testWrongRuneResetsPuzzleProgress() {
-    var flow = LockFlow(theme: .wood)
-    _ = flow.chooseRune(flow.requiredSequence[0])
-
-    let move = flow.chooseRune(.moon)
-
-    XCTAssertEqual(move, .incorrect)
-    XCTAssertEqual(flow.phase, .awaitingSequence)
-    XCTAssertEqual(flow.progress, 0)
-  }
-
-  func testSelectingThemeChangesSequenceAndResetsState() {
-    var flow = LockFlow(theme: .wood)
-    _ = flow.chooseRune(flow.requiredSequence[0])
-    let woodenSequence = flow.requiredSequence
+    _ = flow.knockWoodDoor()
 
     flow.selectTheme(.formation)
 
     XCTAssertEqual(flow.theme, .formation)
-    XCTAssertNotEqual(flow.requiredSequence, woodenSequence)
-    XCTAssertEqual(flow.phase, .awaitingSequence)
-    XCTAssertEqual(flow.progress, 0)
-    XCTAssertNil(flow.lastMove)
+    XCTAssertEqual(flow.phase, .sealed)
+    XCTAssertEqual(flow.woodKnockCount, 0)
+  }
+
+  func testSelectingTheCurrentThemeRestartsItsRitual() {
+    var flow = LockFlow(theme: .wood)
+    _ = flow.knockWoodDoor()
+
+    flow.selectTheme(.wood)
+
+    XCTAssertEqual(flow.theme, .wood)
+    XCTAssertEqual(flow.phase, .sealed)
+    XCTAssertEqual(flow.woodKnockCount, 0)
   }
 
   func testFinishingUnlockAnimationOpensDoor() {
     var flow = LockFlow(theme: .formation)
-    for rune in flow.requiredSequence {
-      flow.chooseRune(rune)
-    }
+    _ = flow.applyFormationTrace(score: 1)
 
     flow.finishUnlockAnimation()
 
@@ -193,24 +169,19 @@ final class LockFlowTests: XCTestCase {
 
   func testResetReturnsCurrentThemeToSealedState() {
     var flow = LockFlow(theme: .formation)
-    for rune in flow.requiredSequence {
-      flow.chooseRune(rune)
-    }
+    _ = flow.applyFormationTrace(score: 1)
     flow.finishUnlockAnimation()
 
     flow.reset()
 
     XCTAssertEqual(flow.theme, .formation)
-    XCTAssertEqual(flow.phase, .awaitingSequence)
-    XCTAssertEqual(flow.progress, 0)
-    XCTAssertNil(flow.lastMove)
+    XCTAssertEqual(flow.phase, .sealed)
+    XCTAssertEqual(flow.formationEnergy, 0)
   }
 
   func testFinishingRevealRequestsReturnToDesktop() {
     var flow = LockFlow(theme: .formation)
-    for rune in flow.requiredSequence {
-      flow.chooseRune(rune)
-    }
+    _ = flow.applyFormationTrace(score: 1)
     flow.finishUnlockAnimation()
 
     flow.finishReveal()
@@ -223,16 +194,16 @@ final class LockFlowTests: XCTestCase {
 
     flow.finishReveal()
 
-    XCTAssertEqual(flow.phase, .awaitingSequence)
+    XCTAssertEqual(flow.phase, .sealed)
   }
 
-  func testInputIsIgnoredAfterPuzzleCompletes() {
+  func testInputIsIgnoredAfterRitualCompletes() {
     var flow = LockFlow(theme: .wood)
-    for rune in flow.requiredSequence {
-      flow.chooseRune(rune)
-    }
+    _ = flow.knockWoodDoor()
+    _ = flow.knockWoodDoor()
+    _ = flow.knockWoodDoor()
 
-    let move = flow.chooseRune(.sun)
+    let move = flow.knockWoodDoor()
 
     XCTAssertEqual(move, .ignored)
     XCTAssertEqual(flow.phase, .unlocking)

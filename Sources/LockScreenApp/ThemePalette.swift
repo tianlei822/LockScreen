@@ -51,17 +51,54 @@ struct ThemePalette {
   )
 }
 
+struct RitualDescriptor {
+  let title: String
+  let subtitle: String
+  let symbolName: String
+  let launchArgument: String
+  let palette: ThemePalette
+}
+
 extension DoorTheme {
-  var palette: ThemePalette {
+  var descriptor: RitualDescriptor {
     switch self {
     case .solar:
-      .solar
+      RitualDescriptor(
+        title: L10n.text("Solar Atlas"),
+        subtitle: L10n.text("Orbit · Light · Helios"),
+        symbolName: "sun.max.fill",
+        launchArgument: "--solar",
+        palette: .solar
+      )
     case .wood:
-      .wood
+      RitualDescriptor(
+        title: L10n.text("Wooden Door"),
+        subtitle: L10n.text("Oak · Brass · Ember"),
+        symbolName: "door.left.hand.closed",
+        launchArgument: "--wood",
+        palette: .wood
+      )
     case .formation:
-      .formation
+      RitualDescriptor(
+        title: L10n.text("Five-Phase Formation"),
+        subtitle: L10n.text("Cycle · Trace · Aether"),
+        symbolName: "seal.fill",
+        launchArgument: "--formation",
+        palette: .formation
+      )
     case .vault:
-      .vault
+      RitualDescriptor(
+        title: L10n.text("Cipher Vault"),
+        subtitle: L10n.text("Steel · Code · Relay"),
+        symbolName: "lock.square.fill",
+        launchArgument: "--vault",
+        palette: .vault
+      )
     }
   }
+
+  var title: String { descriptor.title }
+  var subtitle: String { descriptor.subtitle }
+  var symbolName: String { descriptor.symbolName }
+  var palette: ThemePalette { descriptor.palette }
 }

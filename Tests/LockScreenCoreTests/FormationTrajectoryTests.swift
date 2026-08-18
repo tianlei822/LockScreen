@@ -72,4 +72,27 @@ final class FormationTrajectoryTests: XCTestCase {
     XCTAssertEqual(halfCharge, 0.5, accuracy: 0.08)
     XCTAssertGreaterThan(fullCharge, 0.95)
   }
+
+  func testTraceAccumulatorIgnoresNearbySamples() {
+    var trace = FormationTraceAccumulator(trajectory: .circle)
+
+    XCTAssertTrue(trace.append(NormalizedPoint(x: 0.1, y: 0.1)))
+    XCTAssertFalse(trace.append(NormalizedPoint(x: 0.103, y: 0.103)))
+
+    XCTAssertEqual(trace.points, [NormalizedPoint(x: 0.1, y: 0.1)])
+    XCTAssertEqual(trace.completion, 0)
+  }
+
+  func testTraceAccumulatorBoundsSamplesWithoutLosingTheGesture() {
+    var trace = FormationTraceAccumulator(trajectory: .circle)
+    let template = FormationTrajectoryMatcher.template(for: .circle, sampleCount: 2_048)
+
+    for point in template {
+      trace.append(point)
+    }
+
+    XCTAssertLessThanOrEqual(trace.points.count, FormationTraceAccumulator.maximumSampleCount)
+    XCTAssertGreaterThan(trace.completion, 0.95)
+    XCTAssertGreaterThan(trace.score, 0.95)
+  }
 }

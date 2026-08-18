@@ -6,6 +6,7 @@ struct FormationDoorArtwork: View {
   let isActivated: Bool
   let trajectory: FormationTrajectory
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
+  @Environment(\.ritualMotionReduced) private var ritualMotionReduced
 
   private let ink = Color(red: 0.008, green: 0.025, blue: 0.048)
   private var cyan: Color { trajectory.visualStyle.primary }
@@ -14,6 +15,7 @@ struct FormationDoorArtwork: View {
 
   /// Eight trigrams used as the outer formation eyes (阵眼).
   private let trigrams = ["☰", "☱", "☲", "☳", "☴", "☵", "☶", "☷"]
+  private let formationRunes = ["☼", "≋", "△", "◐"]
 
   @State private var activationStart: TimeInterval?
 
@@ -21,7 +23,10 @@ struct FormationDoorArtwork: View {
     TimelineView(
       .animation(
         minimumInterval: trajectory == .circle ? 1 / 18 : 1 / 20,
-        paused: ritualAnimationsPaused
+        paused: RitualMotionPolicy.pausesVisualEffects(
+          renderingPaused: ritualAnimationsPaused,
+          reduceMotion: ritualMotionReduced
+        )
       )
     ) { timeline in
       GeometryReader { proxy in
@@ -394,7 +399,7 @@ struct FormationDoorArtwork: View {
       ForEach(0..<12, id: \.self) { index in
         let angle = Double(index) * 30 + time * 11
 
-        Text(Rune.allCases[index % Rune.allCases.count].symbol)
+        Text(formationRunes[index % formationRunes.count])
           .font(.system(size: 14, weight: .light, design: .monospaced))
           .foregroundStyle(index.isMultiple(of: 3) ? jade : cyan.opacity(0.5 + level * 0.3))
           .shadow(color: cyan.opacity(0.35 + level * 0.45), radius: 4 + level * 4)
@@ -589,20 +594,23 @@ struct FormationDoorArtwork: View {
   }
 
   private func doorSeam(level: Double) -> some View {
-    ZStack {
+    let glowOpacity = isActivated ? 0.34 : 0.025 + level * 0.07
+    let lineOpacity = isActivated ? 0.82 : 0.16 + level * 0.24
+
+    return ZStack {
       Rectangle()
-        .fill(cyan.opacity(0.14 + level * 0.2))
-        .frame(width: 16)
-        .blur(radius: 10)
+        .fill(cyan.opacity(glowOpacity))
+        .frame(width: isActivated ? 16 : 8)
+        .blur(radius: isActivated ? 10 : 12)
       Rectangle()
         .fill(
           LinearGradient(
-            colors: [.clear, cyan.opacity(0.75), .clear],
+            colors: [.clear, cyan.opacity(lineOpacity), .clear],
             startPoint: .top,
             endPoint: .bottom
           )
         )
-        .frame(width: 1)
+        .frame(width: isActivated ? 1.2 : 0.6)
     }
     .blendMode(.plusLighter)
   }

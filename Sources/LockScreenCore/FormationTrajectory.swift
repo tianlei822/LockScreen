@@ -7,38 +7,6 @@ public enum FormationTrajectory: String, CaseIterable, Identifiable, Sendable {
 
   public var id: Self { self }
 
-  public var title: String {
-    switch self {
-    case .circle:
-      "Five Phases"
-    case .infinity:
-      "Bagua Flow"
-    case .triangle:
-      "Thunder Seal"
-    }
-  }
-
-  public var symbol: String {
-    switch self {
-    case .circle:
-      "五"
-    case .infinity:
-      "卦"
-    case .triangle:
-      "ϟ"
-    }
-  }
-
-  public var invocation: String {
-    switch self {
-    case .circle:
-      "FIVE PHASES · GENERATION CYCLE"
-    case .infinity:
-      "QIAN · KUN · ZHEN · XUN · KAN · LI · GEN · DUI"
-    case .triangle:
-      "CALL THE NINEFOLD THUNDER"
-    }
-  }
 }
 
 public struct NormalizedPoint: Equatable, Sendable {
@@ -48,6 +16,65 @@ public struct NormalizedPoint: Equatable, Sendable {
   public init(x: Double, y: Double) {
     self.x = x
     self.y = y
+  }
+}
+
+/// Incrementally records a drag gesture without rescanning an ever-growing point array.
+public struct FormationTraceAccumulator: Sendable {
+  public static let maximumSampleCount = 384
+  public static let minimumSampleDistance = 0.006
+
+  public let trajectory: FormationTrajectory
+  public private(set) var points: [NormalizedPoint] = []
+
+  private let targetLength: Double
+  private var drawnLength = 0.0
+
+  public init(trajectory: FormationTrajectory) {
+    self.trajectory = trajectory
+    targetLength = FormationTrajectoryMatcher.pathLength(
+      FormationTrajectoryMatcher.template(for: trajectory)
+    )
+  }
+
+  public var completion: Double {
+    guard targetLength > 0 else { return 0 }
+    return max(0, min(1, drawnLength / targetLength))
+  }
+
+  public var score: Double {
+    FormationTrajectoryMatcher.score(points, for: trajectory)
+  }
+
+  @discardableResult
+  public mutating func append(_ point: NormalizedPoint) -> Bool {
+    guard let previous = points.last else {
+      points.append(point)
+      return true
+    }
+
+    let segmentLength = hypot(point.x - previous.x, point.y - previous.y)
+    guard segmentLength >= Self.minimumSampleDistance else { return false }
+
+    drawnLength += segmentLength
+    compactSamplesIfNeeded()
+    points.append(point)
+    return true
+  }
+
+  public mutating func reset() {
+    points.removeAll(keepingCapacity: true)
+    drawnLength = 0
+  }
+
+  private mutating func compactSamplesIfNeeded() {
+    guard points.count >= Self.maximumSampleCount else { return }
+
+    var compacted = stride(from: 0, to: points.count, by: 2).map { points[$0] }
+    if compacted.last != points.last, let last = points.last {
+      compacted.append(last)
+    }
+    points = compacted
   }
 }
 
@@ -206,7 +233,7 @@ public enum FormationTrajectoryMatcher {
     hypot(lhs.x - rhs.x, lhs.y - rhs.y)
   }
 
-  private static func pathLength(_ points: [NormalizedPoint]) -> Double {
+  fileprivate static func pathLength(_ points: [NormalizedPoint]) -> Double {
     guard points.count > 1 else { return 0 }
 
     return zip(points, points.dropFirst()).reduce(0) { length, pair in

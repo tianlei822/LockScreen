@@ -1,3 +1,4 @@
+import LockScreenCore
 import SwiftUI
 
 struct VaultDoorArtwork: View {
@@ -6,10 +7,17 @@ struct VaultDoorArtwork: View {
   private let warmSteel = Color(red: 0.32, green: 0.3, blue: 0.25)
   private let amber = Color(red: 0.94, green: 0.61, blue: 0.18)
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
+  @Environment(\.ritualMotionReduced) private var ritualMotionReduced
 
   var body: some View {
     TimelineView(
-      .animation(minimumInterval: 1 / 20, paused: ritualAnimationsPaused)
+      .animation(
+        minimumInterval: 1 / 20,
+        paused: RitualMotionPolicy.pausesVisualEffects(
+          renderingPaused: ritualAnimationsPaused,
+          reduceMotion: ritualMotionReduced
+        )
+      )
     ) { timeline in
       GeometryReader { proxy in
         let size = proxy.size
@@ -103,7 +111,7 @@ struct VaultDoorArtwork: View {
       .offset(y: -height * 0.11)
 
       VStack(spacing: 7) {
-        Text("THRESHOLD // VAULT")
+        Text(L10n.text("THRESHOLD // VAULT"))
           .font(.system(size: 10, weight: .semibold, design: .monospaced))
           .tracking(3)
         Rectangle()

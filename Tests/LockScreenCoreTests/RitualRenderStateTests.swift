@@ -21,4 +21,19 @@ final class RitualRenderStateTests: XCTestCase {
     XCTAssertFalse(state.isPresented)
     XCTAssertTrue(state.pausesAnimations)
   }
+
+  func testVisualEffectsPauseForReducedMotionEvenWhilePresented() {
+    XCTAssertTrue(
+      RitualMotionPolicy.pausesVisualEffects(
+        renderingPaused: false,
+        reduceMotion: true
+      )
+    )
+    XCTAssertFalse(
+      RitualMotionPolicy.pausesVisualEffects(
+        renderingPaused: false,
+        reduceMotion: false
+      )
+    )
+  }
 }

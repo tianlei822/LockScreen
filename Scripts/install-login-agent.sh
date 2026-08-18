@@ -1,16 +1,19 @@
 #!/bin/sh
 
 # Configures (or with --uninstall, removes) a LaunchAgent that starts Threshold
-# in background mode at login, so ⌘L summons the lock ritual anytime. Pass
+# in background mode at login, so the configured shortcut summons the ritual. Pass
 # --workspace to run the signed bundle from .build without installing a copy.
 
 set -eu
 
-label="com.tianlei.threshold"
-plist="$HOME/Library/LaunchAgents/$label.plist"
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-source_app="$project_root/.build/Threshold.app"
-installed_app=${THRESHOLD_INSTALL_PATH:-$HOME/Applications/Threshold.app}
+info_plist="$project_root/Support/Info.plist"
+display_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$info_plist")
+executable_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$info_plist")
+label=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist")
+plist="$HOME/Library/LaunchAgents/$label.plist"
+source_app="$project_root/.build/$display_name.app"
+installed_app=${THRESHOLD_INSTALL_PATH:-$HOME/Applications/$display_name.app}
 domain="gui/$(id -u)"
 mode=${1:-}
 
@@ -30,9 +33,9 @@ else
   exit 2
 fi
 
-binary="$runtime_app/Contents/MacOS/LockScreen"
+binary="$runtime_app/Contents/MacOS/$executable_name"
 
-if [ ! -x "$source_app/Contents/MacOS/LockScreen" ]; then
+if [ ! -x "$source_app/Contents/MacOS/$executable_name" ]; then
   echo "bundle not found at $source_app — run sh Scripts/build-app.sh first" >&2
   exit 1
 fi
@@ -97,7 +100,7 @@ until launchctl print "$domain/$label" 2>/dev/null | /usr/bin/grep -Fq "state = 
 done
 
 if [ "$mode" = "--workspace" ]; then
-  echo "started $label from $source_app — no app copy installed; press ⌘L to lock"
+  echo "started $label from $source_app — no app copy installed; use the configured shortcut (default ⌘L) to lock"
 else
-  echo "installed $label at $installed_app — Threshold stays ready in the background; press ⌘L to lock"
+  echo "installed $label at $installed_app — $display_name stays ready; use the configured shortcut (default ⌘L) to lock"
 fi

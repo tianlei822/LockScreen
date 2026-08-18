@@ -6,8 +6,9 @@ struct VaultPasscodeView: View {
   let onUpdatePasscode: (String) -> Bool
 
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
+  @Environment(\.ritualMotionReduced) private var ritualMotionReduced
   @State private var passcode = ""
-  @State private var status = "ENTER ACCESS CODE"
+  @State private var status = L10n.text("ENTER ACCESS CODE")
   @State private var isRejected = false
   @State private var isShaking = false
   @State private var isShowingPasscodeSettings = false
@@ -28,10 +29,10 @@ struct VaultPasscodeView: View {
           Image(systemName: "lock.square.stack.fill")
             .font(.system(size: 17, weight: .medium))
           VStack(alignment: .leading, spacing: 2) {
-            Text("CIPHER SAFE")
+            Text(L10n.text("CIPHER SAFE"))
               .font(.system(size: 12, weight: .bold, design: .monospaced))
               .tracking(2.4)
-            Text("LOCAL RITUAL ACCESS")
+            Text(L10n.text("LOCAL RITUAL ACCESS"))
               .font(.system(size: 8, weight: .medium, design: .monospaced))
               .tracking(1.5)
               .foregroundStyle(Color.white.opacity(0.42))
@@ -51,8 +52,8 @@ struct VaultPasscodeView: View {
           }
           .buttonStyle(.plain)
           .foregroundStyle(Color.white.opacity(0.62))
-          .accessibilityLabel("Change Vault ritual code")
-          .help("Change the persistent Vault ritual code")
+          .accessibilityLabel(L10n.text("Change Vault ritual code"))
+          .help(L10n.text("Change the persistent Vault ritual code"))
 
           Circle()
             .fill(isRejected ? Color.red : amber)
@@ -60,7 +61,7 @@ struct VaultPasscodeView: View {
             .shadow(color: isRejected ? .red : amber, radius: 6)
         }
 
-        SecureField("Passcode", text: $passcode)
+        SecureField(L10n.text("Passcode"), text: $passcode)
           .textFieldStyle(.plain)
           .font(.system(size: 24, weight: .medium, design: .monospaced))
           .multilineTextAlignment(.center)
@@ -74,15 +75,16 @@ struct VaultPasscodeView: View {
           .focused($isFocused)
           .onSubmit(submit)
           .onChange(of: passcode) { _, value in
-            let digits = value.filter(\.isNumber)
-            passcode = String(digits.prefix(8))
-            if isRejected || status == "CODE UPDATED", !passcode.isEmpty {
+            passcode = VaultPasscode.filteredInput(value)
+            if isRejected || status == L10n.text("CODE UPDATED"), !passcode.isEmpty {
               isRejected = false
-              status = "ENTER ACCESS CODE"
+              status = L10n.text("ENTER ACCESS CODE")
             }
           }
-          .accessibilityLabel("Vault passcode")
-          .accessibilityHint("Enter the configured 4 to 8 digit code, then press Return")
+          .accessibilityLabel(L10n.text("Vault passcode"))
+          .accessibilityHint(
+            L10n.text("Enter the configured 4 to 8 digit code, then press Return")
+          )
 
         LazyVGrid(
           columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8
@@ -185,7 +187,7 @@ struct VaultPasscodeView: View {
 
   private func submit() {
     guard !passcode.isEmpty else {
-      reject(message: "CODE REQUIRED")
+      reject(message: L10n.text("CODE REQUIRED"))
       return
     }
 
@@ -196,10 +198,10 @@ struct VaultPasscodeView: View {
 
     switch result {
     case .completed:
-      status = "ACCESS GRANTED"
+      status = L10n.text("ACCESS GRANTED")
       isRejected = false
     case .incorrect:
-      reject(message: "ACCESS DENIED")
+      reject(message: L10n.text("ACCESS DENIED"))
     case .ignored:
       break
     }
@@ -208,6 +210,11 @@ struct VaultPasscodeView: View {
   private func reject(message: String) {
     status = message
     isRejected = true
+    guard !ritualMotionReduced else {
+      isShaking = false
+      return
+    }
+
     withAnimation(.spring(response: 0.14, dampingFraction: 0.25)) {
       isShaking = true
     }
@@ -224,14 +231,14 @@ struct VaultPasscodeView: View {
     guard onUpdatePasscode(updatedPasscode) else { return false }
 
     passcode.removeAll()
-    status = "CODE UPDATED"
+    status = L10n.text("CODE UPDATED")
     isRejected = false
     return true
   }
 
   private func resetForNextSession() {
     passcode.removeAll()
-    status = "ENTER ACCESS CODE"
+    status = L10n.text("ENTER ACCESS CODE")
     isRejected = false
     isShaking = false
     isShowingPasscodeSettings = false
@@ -241,11 +248,11 @@ struct VaultPasscodeView: View {
   private func keypadAccessibilityLabel(_ key: String) -> String {
     switch key {
     case "delete":
-      "Delete last digit"
+      L10n.text("Delete last digit")
     case "submit":
-      "Unlock vault"
+      L10n.text("Unlock vault")
     default:
-      "Digit \(key)"
+      L10n.format("Digit %@", key)
     }
   }
 }

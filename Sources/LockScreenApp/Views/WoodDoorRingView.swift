@@ -1,5 +1,17 @@
 import SwiftUI
 
+private enum DoorRingSide {
+  case left
+  case right
+
+  var localizedName: String {
+    switch self {
+    case .left: L10n.text("left")
+    case .right: L10n.text("right")
+    }
+  }
+}
+
 struct WoodDoorRingView: View {
   let knockCount: Int
   let onKnock: () -> Void
@@ -8,13 +20,13 @@ struct WoodDoorRingView: View {
     GeometryReader { proxy in
       ZStack {
         HStack(spacing: min(150, proxy.size.width * 0.075)) {
-          DoorRingButton(sideName: "left", knockCount: knockCount, onKnock: onKnock)
-          DoorRingButton(sideName: "right", knockCount: knockCount, onKnock: onKnock)
+          DoorRingButton(side: .left, knockCount: knockCount, onKnock: onKnock)
+          DoorRingButton(side: .right, knockCount: knockCount, onKnock: onKnock)
         }
         .position(x: proxy.size.width / 2, y: proxy.size.height * 0.54)
 
         VStack(spacing: 10) {
-          Text("KNOCK THREE TIMES")
+          Text(L10n.text("KNOCK THREE TIMES"))
             .font(.system(size: 11, weight: .semibold, design: .monospaced))
             .tracking(4)
 
@@ -43,7 +55,7 @@ struct WoodDoorRingView: View {
 }
 
 private struct DoorRingButton: View {
-  let sideName: String
+  let side: DoorRingSide
   let knockCount: Int
   let onKnock: () -> Void
 
@@ -51,12 +63,13 @@ private struct DoorRingButton: View {
   @State private var rippleProgress = 1.0
   @State private var struck = false
   @State private var knockID = 0
+  @Environment(\.ritualMotionReduced) private var ritualMotionReduced
 
   private let brass = Color(red: 0.78, green: 0.55, blue: 0.22)
 
   private var strikeAngle: Double {
     let magnitude = 13 + Double(min(knockCount, 2)) * 2
-    return sideName == "left" ? magnitude : -magnitude
+    return side == .left ? magnitude : -magnitude
   }
 
   var body: some View {
@@ -118,12 +131,17 @@ private struct DoorRingButton: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel("Knock \(sideName) door ring")
-    .accessibilityValue("\(knockCount) of 3 knocks")
-    .help("Knock either ring three times")
+    .accessibilityLabel(L10n.format("Knock %@ door ring", side.localizedName))
+    .accessibilityValue(L10n.format("%lld of 3 knocks", knockCount))
+    .help(L10n.text("Knock either ring three times"))
   }
 
   private func knock() {
+    guard !ritualMotionReduced else {
+      onKnock()
+      return
+    }
+
     knockID += 1
     let currentKnock = knockID
     var resetTransaction = Transaction()

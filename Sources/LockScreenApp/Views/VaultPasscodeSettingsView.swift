@@ -28,10 +28,10 @@ struct VaultPasscodeSettingsView: View {
           .accessibilityHidden(true)
 
         VStack(alignment: .leading, spacing: 3) {
-          Text("CHANGE RITUAL CODE")
+          Text(L10n.text("CHANGE RITUAL CODE"))
             .font(.system(size: 13, weight: .bold, design: .monospaced))
             .tracking(1.8)
-          Text("PERSISTENT · THIS MAC")
+          Text(L10n.text("PERSISTENT · THIS MAC"))
             .font(.system(size: 9, weight: .semibold, design: .monospaced))
             .tracking(1.4)
             .foregroundStyle(Color.white.opacity(0.44))
@@ -40,14 +40,14 @@ struct VaultPasscodeSettingsView: View {
 
       VStack(alignment: .leading, spacing: 12) {
         passcodeField(
-          title: "NEW CODE",
-          placeholder: "4–8 digits",
+          title: L10n.text("NEW CODE"),
+          placeholder: L10n.text("4–8 digits"),
           text: $passcode,
           field: .passcode
         )
         passcodeField(
-          title: "CONFIRM CODE",
-          placeholder: "Enter again",
+          title: L10n.text("CONFIRM CODE"),
+          placeholder: L10n.text("Enter again"),
           text: $confirmation,
           field: .confirmation
         )
@@ -67,7 +67,7 @@ struct VaultPasscodeSettingsView: View {
         Image(systemName: "exclamationmark.shield")
           .foregroundStyle(amber.opacity(0.76))
           .accessibilityHidden(true)
-        Text("Threshold ritual code only. Never use your macOS password.")
+        Text(L10n.text("Threshold ritual code only. Never use your macOS password."))
           .font(.system(size: 10, weight: .medium))
           .foregroundStyle(Color.white.opacity(0.56))
           .fixedSize(horizontal: false, vertical: true)
@@ -76,13 +76,13 @@ struct VaultPasscodeSettingsView: View {
       HStack(spacing: 10) {
         Spacer()
 
-        Button("Cancel") {
+        Button(L10n.text("Cancel")) {
           dismiss()
         }
         .buttonStyle(.bordered)
         .keyboardShortcut(.cancelAction)
 
-        Button("Save Code") {
+        Button(L10n.text("Save Code")) {
           save()
         }
         .buttonStyle(.borderedProminent)
@@ -137,7 +137,7 @@ struct VaultPasscodeSettingsView: View {
         }
         .focused($focusedField, equals: field)
         .onChange(of: text.wrappedValue) { _, value in
-          let filteredValue = String(value.filter(\.isNumber).prefix(8))
+          let filteredValue = VaultPasscode.filteredInput(value)
           if filteredValue != value {
             text.wrappedValue = filteredValue
           }
@@ -153,18 +153,18 @@ struct VaultPasscodeSettingsView: View {
 
   private var validationMessage: String {
     if saveFailed {
-      return "CODE COULD NOT BE SAVED"
+      return L10n.text("CODE COULD NOT BE SAVED")
     }
     if passcode.isEmpty || confirmation.isEmpty {
-      return "ENTER AND CONFIRM 4–8 DIGITS"
+      return L10n.text("ENTER AND CONFIRM 4–8 DIGITS")
     }
     if !LockFlow.isValidVaultPasscode(passcode) {
-      return "CODE MUST CONTAIN 4–8 DIGITS"
+      return L10n.text("CODE MUST CONTAIN 4–8 DIGITS")
     }
     if passcode != confirmation {
-      return "CODES DO NOT MATCH"
+      return L10n.text("CODES DO NOT MATCH")
     }
-    return "READY TO SAVE"
+    return L10n.text("READY TO SAVE")
   }
 
   private var validationSymbol: String {

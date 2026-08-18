@@ -52,9 +52,9 @@ Use small value types, explicit state transitions, and focused SwiftUI views. UI
 
 ```swift
 @MainActor
-func chooseRune(_ rune: Rune) {
-    guard phase == .awaitingSequence else { return }
-    puzzle.choose(rune)
+func reset() {
+    cancelUnlockSequence()
+    flow.reset()
 }
 ```
 
@@ -91,9 +91,11 @@ Names use `UpperCamelCase` for types and `lowerCamelCase` for values. Layout use
 - After the reveal, the app hides and closes without an intermediate window, restoring the user's previous workspace directly.
 - Reset returns the selected theme to a sealed state.
 - The app uses a borderless overlay on the current Space for instant dismissal and exposes an obvious way to return to windowed mode.
-- VoiceOver labels describe theme, rune, reset, and fullscreen controls.
+- VoiceOver labels describe the selected theme, ritual input, reset, and immersive controls.
+- Reduce Motion pauses decorative timelines and simplifies large transitions; Reduce Transparency strengthens control backplates.
+- User-facing controls support English and Simplified Chinese localization.
 
 ## Open Questions
 
 - A future release may package the passive visuals as a `.saver` module. macOS will continue to own the secure password/Touch ID interface.
-- Automatic launch and system-lock invocation are intentionally deferred because they introduce permissions, lifecycle, and distribution decisions.
+- The optional LaunchAgent keeps the status-bar process available at login; the selected Carbon shortcut summons the ritual without Accessibility permission.

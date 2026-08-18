@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
   name: "LockScreen",
+  defaultLocalization: "en",
   platforms: [
     .macOS(.v14)
   ],
@@ -14,7 +15,8 @@ let package = Package(
     .target(name: "LockScreenCore"),
     .executableTarget(
       name: "LockScreenApp",
-      dependencies: ["LockScreenCore"]
+      dependencies: ["LockScreenCore"],
+      resources: [.process("Resources")]
     ),
     .testTarget(
       name: "LockScreenCoreTests",

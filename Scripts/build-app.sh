@@ -3,7 +3,18 @@
 set -eu
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-bundle_path="$project_root/.build/Threshold.app"
+info_plist="$project_root/Support/Info.plist"
+display_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$info_plist")
+executable_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$info_plist")
+bundle_identifier=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist")
+minimum_system_version=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$info_plist")
+default_bundle_path="$project_root/.build/$display_name.app"
+configured_bundle_path=${THRESHOLD_BUILD_PATH:-$default_bundle_path}
+case "$configured_bundle_path" in
+  /*) bundle_path=$configured_bundle_path ;;
+  *) bundle_path="$project_root/$configured_bundle_path" ;;
+esac
+bundle_parent=$(dirname -- "$bundle_path")
 default_signing_identity="B4035AE98DA51B2F173CF52BAACC758E5B35DF63"
 signing_identity=${APPLE_SIGNING_IDENTITY:-$default_signing_identity}
 staging_root=""
@@ -25,9 +36,17 @@ trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 
 if [ "$signing_identity" = "-" ]; then
-  echo "ad-hoc signing is disabled because it changes Threshold's macOS code identity after every rebuild" >&2
+  echo "ad-hoc signing is disabled because it changes $display_name's macOS code identity after every rebuild" >&2
   exit 1
 fi
+
+case "$bundle_path" in
+  *.app) ;;
+  *)
+    echo "THRESHOLD_BUILD_PATH must end in .app: $bundle_path" >&2
+    exit 1
+    ;;
+esac
 
 available_identities=$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null || true)
 if ! printf '%s\n' "$available_identities" | /usr/bin/grep -Fq -- "$signing_identity"; then
@@ -40,19 +59,26 @@ cd "$project_root"
 swift build -c release
 binary_dir=$(swift build -c release --show-bin-path)
 
-mkdir -p "$project_root/.build"
-staging_root=$(mktemp -d "$project_root/.build/Threshold.staging.XXXXXX")
-staged_bundle="$staging_root/Threshold.app"
-asset_info_path="$staging_root/ThresholdAppIcon-info.plist"
+mkdir -p "$bundle_parent"
+staging_root=$(mktemp -d "$bundle_parent/$display_name.staging.XXXXXX")
+staged_bundle="$staging_root/$display_name.app"
+asset_info_path="$staging_root/AppIcon-info.plist"
 
 mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources"
-cp -f "$binary_dir/LockScreen" "$staged_bundle/Contents/MacOS/LockScreen"
-cp -f "$project_root/Support/Info.plist" "$staged_bundle/Contents/Info.plist"
+cp -f "$binary_dir/$executable_name" "$staged_bundle/Contents/MacOS/$executable_name"
+cp -f "$info_plist" "$staged_bundle/Contents/Info.plist"
+
+for resource_bundle in "$binary_dir"/*.bundle; do
+  if [ -d "$resource_bundle" ]; then
+    /usr/bin/ditto "$resource_bundle" \
+      "$staged_bundle/Contents/Resources/$(basename -- "$resource_bundle")"
+  fi
+done
 
 xcrun actool "$project_root/Support/Assets.xcassets" \
   --compile "$staged_bundle/Contents/Resources" \
   --platform macosx \
-  --minimum-deployment-target 14.0 \
+  --minimum-deployment-target "$minimum_system_version" \
   --app-icon AppIcon \
   --output-partial-info-plist "$asset_info_path"
 
@@ -65,17 +91,17 @@ xcrun actool "$project_root/Support/Assets.xcassets" \
 /usr/bin/codesign --verify --deep --strict "$staged_bundle"
 
 domain="gui/$(id -u)"
-label="com.tianlei.threshold"
+label="$bundle_identifier"
 service_info=$(launchctl print "$domain/$label" 2>/dev/null || true)
 if printf '%s\n' "$service_info" \
-  | /usr/bin/grep -Fq -- "$bundle_path/Contents/MacOS/LockScreen"; then
+  | /usr/bin/grep -Fq -- "$bundle_path/Contents/MacOS/$executable_name"; then
   echo "refusing to replace the bundle used by the running workspace LaunchAgent" >&2
   echo "stop it first: launchctl bootout $domain/$label" >&2
   exit 1
 fi
 
-if /usr/bin/pgrep -f "$bundle_path/Contents/MacOS/LockScreen" >/dev/null 2>&1; then
-  echo "refusing to replace the bundle while Threshold is running from $bundle_path" >&2
+if /usr/bin/pgrep -f "$bundle_path/Contents/MacOS/$executable_name" >/dev/null 2>&1; then
+  echo "refusing to replace the bundle while $display_name is running from $bundle_path" >&2
   exit 1
 fi
 
@@ -92,5 +118,5 @@ if [ -n "$previous_bundle" ] && [ -e "$previous_bundle" ]; then
   previous_bundle=""
 fi
 
-echo "signed Threshold with $signing_identity"
+echo "signed $display_name with $signing_identity"
 echo "$bundle_path"

@@ -28,12 +28,12 @@
 - [x] Replace the centered door card with a full-bleed scene.
   - Acceptance: both door leaves cover the display behind floating controls at fullscreen and windowed sizes.
   - Verify: local visual inspection of both themes.
-  - Files: `Sources/LockScreenApp/Views/LockScreenView.swift`, `Sources/LockScreenApp/Views/DoorStageView.swift`, `Sources/LockScreenApp/Views/RunePuzzleView.swift`.
+  - Files: `Sources/LockScreenApp/Views/LockScreenView.swift`, `Sources/LockScreenApp/Views/DoorStageView.swift`.
 
 - [x] Return to the desktop after a successful unlock.
   - Acceptance: the model requests dismissal after the reveal; the app exits fullscreen and terminates.
-  - Verify: `swift test` plus a live rune-sequence run where `Threshold` is no longer running afterward.
-  - Files: `Sources/LockScreenCore/LockFlow.swift`, `Sources/LockScreenApp/Views/LockScreenView.swift`, `Tests/LockScreenCoreTests/LockFlowTests.swift`.
+  - Verify: `swift test` plus a live successful ritual where `Threshold` is no longer running afterward.
+  - Files: `Sources/LockScreenCore/LockFlow.swift`, `Sources/LockScreenApp/RitualCoordinator.swift`, `Tests/LockScreenAppTests/RitualCoordinatorTests.swift`.
 
 - [x] Add the wooden-door ring ritual.
   - Acceptance: two animated rings are visible and either ring contributes to a three-knock unlock.
@@ -54,3 +54,13 @@
   - Acceptance: successful unlock hides the app and restores the previous workspace without shrinking into an intermediate window or waiting 700/900 ms.
   - Verify: source inspection, complete tests, and local process-exit check where UI automation permission is available.
   - Files: `Sources/LockScreenApp/Views/LockScreenView.swift`.
+
+- [x] Generalize configuration, lifecycle, and accessibility behavior.
+  - Acceptance: ritual metadata has one descriptor source, lifecycle side effects live in a coordinator, the global shortcut is selectable, controls localize to Simplified Chinese, and reduced-motion/transparency settings are respected.
+  - Verify: configuration, coordinator, hot-key, and render-policy tests plus a signed bundle and runtime inspection.
+  - Files: `Sources/LockScreenApp/AppConfiguration.swift`, `Sources/LockScreenApp/RitualCoordinator.swift`, `Sources/LockScreenApp/StatusItemController.swift`, `Sources/LockScreenApp/Resources/*.lproj/Localizable.strings`.
+
+- [x] Bound live formation sampling and split oversized visual sources.
+  - Acceptance: drag sampling stays bounded while preserving completion and recognition, and each large scene is separated into focused source files.
+  - Verify: `FormationTrajectoryTests`, `swift build`, and live tracing in the formation theme.
+  - Files: `Sources/LockScreenCore/FormationTrajectory.swift`, `Sources/LockScreenApp/Views/FormationTraceView.swift`, `Sources/LockScreenApp/Views/FivePhase*.swift`, `Sources/LockScreenApp/Views/*Formation*.swift`.

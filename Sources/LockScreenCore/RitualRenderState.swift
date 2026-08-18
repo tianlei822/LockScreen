@@ -13,3 +13,12 @@ public struct RitualRenderState: Equatable, Sendable {
     isPresented = false
   }
 }
+
+public enum RitualMotionPolicy {
+  public static func pausesVisualEffects(
+    renderingPaused: Bool,
+    reduceMotion: Bool
+  ) -> Bool {
+    renderingPaused || reduceMotion
+  }
+}

@@ -6,7 +6,7 @@
 set -eu
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-source_file="$project_root/Sources/LockScreenApp/LockScreenApp.swift"
+source_file="$project_root/Sources/LockScreenApp/StatusItemController.swift"
 
 require_source() {
   if ! /usr/bin/grep -Fq -- "$1" "$source_file"; then
@@ -22,11 +22,11 @@ require_source 'buttonCell.showsStateBy = []'
 require_source 'buttonCell.isHighlighted = false'
 require_source 'button.action = #selector(showStatusMenu(_:))'
 require_source 'statusMenu.popUp(positioning: nil, at: .zero, in: sender)'
-require_source 'private func applyTransparentStatusItemAppearance'
-require_source 'static let statusItemAppearanceRefreshDelays'
-require_source 'scheduleStatusItemAppearanceRefresh()'
+require_source 'private func applyTransparentAppearance'
+require_source 'static let appearanceRefreshDelays'
+require_source 'scheduleAppearanceRefresh()'
 require_source 'try await Task.sleep(for: delay)'
-require_source 'Self.configureTransparentStatusItemAppearance(button)'
+require_source 'Self.configureTransparentAppearance(button)'
 
 if /usr/bin/grep -Eq '^[[:space:]]*button\.cell[[:space:]]*=' "$source_file"; then
   echo 'do not replace the AppKit-managed status-bar button cell' >&2

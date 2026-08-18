@@ -16,8 +16,9 @@ struct DoorStageView: View {
 
   @State private var rendersSplitDoors = false
   @State private var splitDoorsOpen = false
+  @Environment(\.ritualMotionReduced) private var ritualMotionReduced
 
-  private var isOpen: Bool { phase != .awaitingSequence }
+  private var isOpen: Bool { phase != .sealed }
 
   var body: some View {
     GeometryReader { proxy in
@@ -31,24 +32,29 @@ struct DoorStageView: View {
         } else if rendersSplitDoors {
           HStack(spacing: 1) {
             leaf(side: .left, fullSize: size)
-              .rotation3DEffect(
-                .degrees(splitDoorsOpen ? -104 : 0),
-                axis: (x: 0, y: 1, z: 0),
-                anchor: .leading,
-                perspective: 0.62
+              .modifier(
+                DoorLeafMotionModifier(
+                  side: .left,
+                  isOpen: splitDoorsOpen,
+                  fullWidth: size.width,
+                  reduceMotion: ritualMotionReduced
+                )
               )
-              .offset(x: splitDoorsOpen ? -size.width * 0.06 : 0)
 
             leaf(side: .right, fullSize: size)
-              .rotation3DEffect(
-                .degrees(splitDoorsOpen ? 104 : 0),
-                axis: (x: 0, y: 1, z: 0),
-                anchor: .trailing,
-                perspective: 0.62
+              .modifier(
+                DoorLeafMotionModifier(
+                  side: .right,
+                  isOpen: splitDoorsOpen,
+                  fullWidth: size.width,
+                  reduceMotion: ritualMotionReduced
+                )
               )
-              .offset(x: splitDoorsOpen ? size.width * 0.06 : 0)
           }
-          .animation(.easeInOut(duration: 1.45), value: splitDoorsOpen)
+          .animation(
+            .easeInOut(duration: ritualMotionReduced ? 0.2 : 1.45),
+            value: splitDoorsOpen
+          )
           .transition(.identity)
         } else {
           // While sealed, both clipped leaves show halves of the same full
@@ -94,9 +100,15 @@ struct DoorStageView: View {
         prepareDoorPresentation(isOpen: isOpen)
       }
     }
-    .animation(.easeInOut(duration: 1.45), value: isOpen)
+    .animation(.easeInOut(duration: ritualMotionReduced ? 0.2 : 1.45), value: isOpen)
     .accessibilityElement(children: theme == .solar ? .contain : .ignore)
-    .accessibilityLabel("\(theme.title), \(isOpen ? "open" : "sealed")")
+    .accessibilityLabel(
+      L10n.format(
+        "%@, %@",
+        theme.title,
+        isOpen ? L10n.text("open") : L10n.text("sealed")
+      )
+    )
   }
 
   private func prepareDoorPresentation(isOpen: Bool) {
@@ -152,7 +164,7 @@ private struct DoorArtworkView: View {
     case .formation:
       FormationDoorArtwork(
         energy: formationEnergy,
-        isActivated: phase != .awaitingSequence,
+        isActivated: phase != .sealed,
         trajectory: formationTrajectory
       )
     case .vault:
@@ -161,16 +173,48 @@ private struct DoorArtworkView: View {
   }
 }
 
+private struct DoorLeafMotionModifier: ViewModifier {
+  let side: DoorSide
+  let isOpen: Bool
+  let fullWidth: CGFloat
+  let reduceMotion: Bool
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if reduceMotion {
+      content
+        .opacity(isOpen ? 0 : 1)
+        .offset(x: isOpen ? (side == .left ? -16 : 16) : 0)
+    } else {
+      content
+        .rotation3DEffect(
+          .degrees(isOpen ? (side == .left ? -104 : 104) : 0),
+          axis: (x: 0, y: 1, z: 0),
+          anchor: side == .left ? .leading : .trailing,
+          perspective: 0.62
+        )
+        .offset(x: isOpen ? (side == .left ? -fullWidth * 0.06 : fullWidth * 0.06) : 0)
+    }
+  }
+}
+
 private struct PortalRevealView: View {
   let theme: DoorTheme
   let isOpen: Bool
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
+  @Environment(\.ritualMotionReduced) private var ritualMotionReduced
 
   var body: some View {
     let palette = theme.palette
 
     TimelineView(
-      .animation(minimumInterval: 1 / 24, paused: ritualAnimationsPaused)
+      .animation(
+        minimumInterval: 1 / 24,
+        paused: RitualMotionPolicy.pausesVisualEffects(
+          renderingPaused: ritualAnimationsPaused,
+          reduceMotion: ritualMotionReduced
+        )
+      )
     ) { timeline in
       let time = timeline.date.timeIntervalSinceReferenceDate
 
@@ -210,7 +254,7 @@ private struct PortalRevealView: View {
             Text(portalSymbol)
               .font(.system(size: unit * 0.16, weight: .ultraLight))
               .shadow(color: palette.accent.opacity(0.8), radius: isOpen ? 18 : 4)
-            Text("THRESHOLD OPEN")
+            Text(L10n.text("THRESHOLD OPEN"))
               .font(.system(size: 12, weight: .semibold, design: .monospaced))
               .tracking(6)
           }

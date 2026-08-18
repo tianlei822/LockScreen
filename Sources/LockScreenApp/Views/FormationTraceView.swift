@@ -14,6 +14,7 @@ struct FormationTraceView: View {
     GeometryReader { proxy in
       let canvasWidth = min(620, proxy.size.width * 0.62)
       let canvasHeight = min(440, proxy.size.height * 0.62)
+      let meterWidth = min(390, max(260, proxy.size.width - 64))
 
       ZStack {
         FormationTraceCanvas(
@@ -28,7 +29,7 @@ struct FormationTraceView: View {
           Spacer()
 
           VStack(spacing: 14) {
-            energyMeter
+            energyMeter(width: meterWidth)
 
             HStack(spacing: 6) {
               ForEach(FormationTrajectory.allCases) { option in
@@ -38,7 +39,7 @@ struct FormationTraceView: View {
                   HStack(spacing: 7) {
                     Text(option.symbol)
                       .font(.system(size: 18, weight: .light))
-                    Text(option.title.uppercased())
+                    Text(option.title)
                       .font(.system(size: 9, weight: .semibold, design: .monospaced))
                       .tracking(1.4)
                   }
@@ -53,7 +54,7 @@ struct FormationTraceView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(option == trajectory ? Color.white : Color.white.opacity(0.58))
-                .accessibilityLabel("Use \(option.title) formation")
+                .accessibilityLabel(L10n.format("Use %@ formation", option.title))
               }
 
               Divider()
@@ -64,7 +65,7 @@ struct FormationTraceView: View {
               Button {
                 onTrace(1)
               } label: {
-                Label("Channel", systemImage: "return")
+                Label(L10n.text("Channel"), systemImage: "return")
                   .font(.system(size: 9, weight: .semibold, design: .monospaced))
                   .tracking(1.2)
                   .padding(.horizontal, 12)
@@ -73,8 +74,10 @@ struct FormationTraceView: View {
               .buttonStyle(.plain)
               .foregroundStyle(style.primary.opacity(0.72))
               .keyboardShortcut(.return, modifiers: [])
-              .accessibilityLabel("Channel the selected formation without dragging")
-              .help("Keyboard alternative: press Return")
+              .accessibilityLabel(
+                L10n.text("Channel the selected formation without dragging")
+              )
+              .help(L10n.text("Keyboard alternative: press Return"))
             }
           }
           .opacity(showsControls ? 1 : 0)
@@ -87,14 +90,14 @@ struct FormationTraceView: View {
     }
   }
 
-  private var energyMeter: some View {
+  private func energyMeter(width: CGFloat) -> some View {
     let style = trajectory.visualStyle
 
     return VStack(spacing: 7) {
       HStack {
         Text(trajectory.invocation)
         Spacer()
-        Text(energy >= 1 ? "ACTIVATED" : "\(Int(energy * 100))%")
+        Text(energy >= 1 ? L10n.text("ACTIVATED") : "\(Int(energy * 100))%")
       }
       .font(.system(size: 9, weight: .semibold, design: .monospaced))
       .tracking(1.8)
@@ -118,9 +121,11 @@ struct FormationTraceView: View {
       }
       .frame(height: 4)
     }
-    .frame(width: 390)
+    .frame(width: width)
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("\(trajectory.title) charge \(Int(energy * 100)) percent")
+    .accessibilityLabel(
+      L10n.format("%@ charge %lld percent", trajectory.title, Int(energy * 100))
+    )
   }
 }
 
@@ -129,6 +134,18 @@ private struct FormationTraceCanvas: View {
   let energy: Double
   let onTrace: (Double) -> Void
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
+  @Environment(\.ritualMotionReduced) private var ritualMotionReduced
+
+  init(
+    trajectory: FormationTrajectory,
+    energy: Double,
+    onTrace: @escaping (Double) -> Void
+  ) {
+    self.trajectory = trajectory
+    self.energy = energy
+    self.onTrace = onTrace
+    _trace = State(initialValue: FormationTraceAccumulator(trajectory: trajectory))
+  }
 
   private enum TraceOutcome {
     case complete
@@ -138,18 +155,20 @@ private struct FormationTraceCanvas: View {
 
   private let amber = Color(red: 1.0, green: 0.62, blue: 0.32)
 
-  @State private var points: [NormalizedPoint] = []
+  @State private var trace: FormationTraceAccumulator
   @State private var traceID = 0
   @State private var isDragging = false
   @State private var outcome: TraceOutcome?
   @State private var outcomeTime: TimeInterval?
-  @State private var liveCharge = 0.0
 
   var body: some View {
     TimelineView(
       .animation(
         minimumInterval: trajectory == .circle ? 1 / 18 : 1 / 20,
-        paused: ritualAnimationsPaused
+        paused: RitualMotionPolicy.pausesVisualEffects(
+          renderingPaused: ritualAnimationsPaused,
+          reduceMotion: ritualMotionReduced
+        )
       )
     ) { timeline in
       GeometryReader { proxy in
@@ -159,7 +178,7 @@ private struct FormationTraceCanvas: View {
         let breath = 0.5 + 0.5 * sin(time * 1.8)
         let outcomeAge = outcomeTime.map { time - $0 }
         let style = guideStyle(at: time)
-        let displayedCharge = max(energy, liveCharge)
+        let displayedCharge = max(energy, trace.completion)
 
         ZStack {
           chargingHalo(
@@ -208,8 +227,8 @@ private struct FormationTraceCanvas: View {
 
           guideSpark(template: template, size: size, time: time, style: style)
 
-          if !points.isEmpty {
-            trajectoryPath(points, in: size)
+          if !trace.points.isEmpty {
+            trajectoryPath(trace.points, in: size)
               .stroke(
                 LinearGradient(
                   colors: [style.secondary, style.primary],
@@ -221,7 +240,7 @@ private struct FormationTraceCanvas: View {
               .shadow(color: style.primary, radius: 8)
           }
 
-          if isDragging, let head = points.last {
+          if isDragging, let head = trace.points.last {
             dragHead(point: head, size: size, time: time, style: style)
           }
 
@@ -238,13 +257,16 @@ private struct FormationTraceCanvas: View {
         }
         .contentShape(Rectangle())
         .gesture(traceGesture(in: size))
-        .accessibilityLabel("Trace the \(trajectory.title) formation path")
-        .accessibilityHint("Drag along the glowing guide, or press Return to channel it")
+        .accessibilityLabel(
+          L10n.format("Trace the %@ formation path", trajectory.title)
+        )
+        .accessibilityHint(
+          L10n.text("Drag along the glowing guide, or press Return to channel it")
+        )
         .onChange(of: trajectory) {
-          points.removeAll()
+          trace = FormationTraceAccumulator(trajectory: trajectory)
           outcome = nil
           outcomeTime = nil
-          liveCharge = 0
         }
       }
     }
@@ -425,20 +447,12 @@ private struct FormationTraceCanvas: View {
       .onChanged { value in
         isDragging = true
         let point = normalized(value.location, in: size)
-        guard let previous = points.last else {
-          points = [point]
-          return
-        }
-
-        guard hypot(point.x - previous.x, point.y - previous.y) > 0.006 else { return }
-        points.append(point)
-        liveCharge = FormationTrajectoryMatcher.completion(points, for: trajectory)
+        trace.append(point)
       }
       .onEnded { value in
         isDragging = false
-        points.append(normalized(value.location, in: size))
-        liveCharge = FormationTrajectoryMatcher.completion(points, for: trajectory)
-        let score = FormationTrajectoryMatcher.score(points, for: trajectory)
+        trace.append(normalized(value.location, in: size))
+        let score = trace.score
         let activationThreshold = FormationTrajectoryMatcher.activationThreshold
         outcome = score >= activationThreshold ? .complete : score >= 0.35 ? .partial : .rejected
         outcomeTime = Date().timeIntervalSinceReferenceDate
@@ -450,8 +464,7 @@ private struct FormationTraceCanvas: View {
           try? await Task.sleep(for: .milliseconds(620))
           guard currentTraceID == traceID else { return }
           withAnimation(.easeOut(duration: 0.24)) {
-            points.removeAll()
-            liveCharge = 0
+            trace.reset()
           }
         }
       }

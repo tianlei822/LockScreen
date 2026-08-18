@@ -40,8 +40,12 @@ swift run LockScreen --vault --passcode=2580
 sh Scripts/build-app.sh
 open .build/Threshold.app
 
-# Lurk in the background (status-menu lock icon) and summon the ritual with ⌘L.
-# 后台潜伏（状态栏锁形图标），随时按 ⌘L 召唤锁屏仪式。
+# Build a separately signed candidate without replacing an app used by a running LaunchAgent.
+# 构建独立签名候选包，避免替换正在被 LaunchAgent 使用的应用。
+THRESHOLD_BUILD_PATH=.build/Threshold-candidate.app sh Scripts/build-app.sh
+
+# Lurk in the background and summon the ritual with the global shortcut (default ⌘L).
+# 后台潜伏，并使用全局快捷键（默认 ⌘L）随时召唤锁屏仪式。
 open .build/Threshold.app --args --background
 
 # Keep the workspace build ready at login without installing an app copy.
@@ -53,13 +57,15 @@ sh Scripts/install-login-agent.sh --workspace
 sh Scripts/install-login-agent.sh
 ```
 
-`⌘L` is registered by Threshold's status-bar-only background process. A macOS App Shortcut cannot
+The selected shortcut is registered by Threshold's status-bar-only background process. Choose
+`⌘L`, `⇧⌘L`, or `⌃⌥L` from the status-menu lock icon; `⌘L` is the default. A macOS App Shortcut cannot
 launch a terminated app, so either keep the app open with `open ... --background`, or configure one
 of the LaunchAgent modes above: `--workspace` runs `.build/Threshold.app` in place without installing
 a copy, while the default mode copies it to `~/Applications`. The main window and Dock icon do not
-need to be open. Carbon registers only this exact key combination, so Threshold does not request
+need to be open. Carbon registers only the selected exact key combination, so Threshold does not request
 Accessibility or Input Monitoring access.
-`⌘L` 由 Threshold 仅驻留状态栏的后台进程注册。macOS“App 快捷键”无法启动已退出的应用，
+Threshold 仅驻留状态栏的后台进程会注册所选快捷键。可在状态栏锁形图标菜单中选择 `⌘L`、
+`⇧⌘L` 或 `⌃⌥L`，默认是 `⌘L`。macOS“App 快捷键”无法启动已退出的应用，
 因此可使用 `open ... --background` 保持进程运行，或配置上述任一 LaunchAgent：`--workspace`
 直接运行 `.build/Threshold.app` 而不复制安装，默认模式则复制到 `~/Applications`。launchd 会让
 接收进程保持运行并在退出后自动重启；主窗口和 Dock 图标都不需要打开。Carbon 只注册这一组
@@ -81,13 +87,15 @@ TCC 权限连续性。可通过 `APPLE_SIGNING_IDENTITY` 指定其他证书；�
 ## Controls / 操作
 
 - Choose `Solar Atlas`, `Five-Phase Formation`, `Wooden Door`, or `Cipher Vault` in the upper-left corner. / 在左上角选择太阳星图、五行阵法、木门或密码箱。
+- Press `R` or use the upper-right reset button to restart the current ritual. / 按 `R` 或点击右上角重置按钮，重新开始当前仪式。
 - On `Solar Atlas`, double-click the sun. VoiceOver users can activate the named sun button once. / 在 `Solar Atlas` 中双击太阳；VoiceOver 用户可直接激活已命名的太阳按钮。
 - On `Wooden Door`, knock either brass ring three times. / 在 `Wooden Door` 中敲击任意黄铜门环三次。
 - On `Five-Phase Formation`, choose `Circle`, `Infinity`, or `Triangle`, then drag along the glowing track to charge it. Press `Return` for the keyboard-accessible channel action. / 在 `Five-Phase Formation` 中选择 `Circle`、`Infinity` 或 `Triangle`，然后沿发光轨迹拖动充能；也可按 `Return` 使用键盘触发。
 - On `Cipher Vault`, enter the configured code with the keyboard or keypad, then press `Return` or the unlock key. Use the gear button to save a persistent 4–8 digit ritual code on this Mac; a valid `--passcode` overrides it for that launch only. The default is `1024`. Never use your macOS password. / 在 `Cipher Vault` 中使用键盘或数字键盘输入配置密码，再按 `Return` 或开锁键。可通过齿轮按钮在本机持久保存 4–8 位仪式密码；有效的 `--passcode` 仅覆盖当次启动。默认值为 `1024`，绝不能使用 macOS 系统密码。
 - After a successful ritual, the doors finish opening, the app hides immediately, and the previous workspace becomes active without an intermediate window. / 仪式成功后，门完成开启，应用立即隐藏并激活之前的工作页面，不再出现中间窗口。
 - Press `⇧⌘F` or use the upper-right button to toggle immersive/windowed mode. / 按 `⇧⌘F` 或点击右上角按钮切换沉浸/窗口模式。
-- Press `⌘L` anywhere to summon the ritual while the background lurker runs (registered globally via Carbon, so it also works on top of other apps; it takes precedence over apps that use `⌘L` themselves, e.g. browser address bars). / 后台潜伏运行时在任意处按 `⌘L` 召唤仪式（经 Carbon 全局注册，在其他应用之上也生效；会抢占浏览器地址栏等自身使用 `⌘L` 的场景）。
+- Use the configured shortcut anywhere to summon the ritual while the background lurker runs. Carbon registers it globally, so choose a preset that does not conflict with shortcuts you rely on in other apps. / 后台潜伏运行时，可在任意位置使用已配置快捷键召唤仪式。该快捷键通过 Carbon 全局注册，请选择不会与常用应用快捷键冲突的预设。
+- Interface text follows English or Simplified Chinese system language settings. Reduce Motion pauses decorative timelines and replaces large transitions; Reduce Transparency strengthens control backplates. / 界面文字会跟随英文或简体中文系统语言设置；“减弱动态效果”会暂停装饰性时间线并简化大型转场，“降低透明度”会增强控件底板。
 - Immersive mode is a kiosk-style takeover: its overlay joins every Space, the menu bar and Dock are hidden, secondary displays are blanked, and app switching/force quit are disabled while the ritual is frontmost. Exit with `⇧⌘F` or `⌘Q`. Note that an unbundled `swift run` binary is not allowed to become the frontmost app on recent macOS, so full coverage requires the bundled app from `sh Scripts/build-app.sh`. / 沉浸模式是 kiosk 式接管：浮层会加入所有工作区，同时隐藏菜单栏与程序坞、以黑屏遮盖副屏，并在仪式位于最前时禁用应用切换与强制退出；可用 `⇧⌘F` 或 `⌘Q` 退出。注意 macOS 不允许未打包的 `swift run` 二进制成为最前应用，完整覆盖效果需使用 `sh Scripts/build-app.sh` 打包后的应用。
 
 ## Verification / 验证

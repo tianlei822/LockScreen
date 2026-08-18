@@ -4,11 +4,11 @@ import SwiftUI
 extension FivePhaseElement {
   var accessibilityName: String {
     switch self {
-    case .wood: "Wood"
-    case .fire: "Fire"
-    case .earth: "Earth"
-    case .metal: "Metal"
-    case .water: "Water"
+    case .wood: L10n.text("Wood")
+    case .fire: L10n.text("Fire")
+    case .earth: L10n.text("Earth")
+    case .metal: L10n.text("Metal")
+    case .water: L10n.text("Water")
     }
   }
 

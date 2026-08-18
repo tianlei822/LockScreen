@@ -11,7 +11,8 @@ enum IdleSuppression {
   private static var userActivityAssertion: IOPMAssertionID = 0
   private static var activityTimer: Timer?
 
-  private static let reason = "Threshold lock ritual is covering the screen" as CFString
+  private static let reason =
+    "\(ProductMetadata.displayName) lock ritual is covering the screen" as CFString
 
   static func begin() {
     guard displaySleepAssertion == 0 else { return }
