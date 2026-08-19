@@ -21,7 +21,9 @@ require_source 'buttonCell.highlightsBy = []'
 require_source 'buttonCell.showsStateBy = []'
 require_source 'buttonCell.isHighlighted = false'
 require_source 'button.action = #selector(showStatusMenu(_:))'
-require_source 'statusMenu.popUp(positioning: nil, at: .zero, in: sender)'
+require_source 'let presentation = Self.detachedMenuPresentation(from: sender)'
+require_source 'await Task.yield()'
+require_source 'in: presentation.view'
 require_source 'private func applyTransparentAppearance'
 require_source 'static let appearanceRefreshDelays'
 require_source 'scheduleAppearanceRefresh()'
@@ -35,6 +37,11 @@ fi
 
 if /usr/bin/grep -Eq '^[[:space:]]*item\.menu[[:space:]]*=' "$source_file"; then
   echo 'do not attach the menu through NSStatusItem.menu; it restores the dark highlight' >&2
+  exit 1
+fi
+
+if /usr/bin/grep -Fq -- 'in: sender' "$source_file"; then
+  echo 'do not anchor the menu to NSStatusBarButton; it restores the dark highlight' >&2
   exit 1
 fi
 

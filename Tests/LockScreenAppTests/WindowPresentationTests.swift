@@ -145,6 +145,26 @@ final class WindowPresentationTests: XCTestCase {
   }
 
   @MainActor
+  func testStatusMenuPresentationIsDetachedFromStatusBarButton() throws {
+    let window = NSWindow(
+      contentRect: NSRect(x: 320, y: 640, width: 24, height: 24),
+      styleMask: [.borderless],
+      backing: .buffered,
+      defer: false
+    )
+    let button = NSStatusBarButton(frame: window.contentView?.bounds ?? .zero)
+    window.contentView = button
+
+    let presentation = try XCTUnwrap(
+      StatusItemController.detachedMenuPresentation(from: button)
+    )
+
+    XCTAssertNil(presentation.view)
+    XCTAssertEqual(presentation.location.x, 320, accuracy: 0.001)
+    XCTAssertEqual(presentation.location.y, 640, accuracy: 0.001)
+  }
+
+  @MainActor
   func testStatusItemAppearanceRefreshContinuesAfterTheNextRunLoop() {
     XCTAssertGreaterThan(StatusItemController.appearanceRefreshDelays.count, 1)
     XCTAssertTrue(

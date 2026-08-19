@@ -2,6 +2,11 @@ import AppKit
 
 @MainActor
 final class StatusItemController: NSObject, NSMenuDelegate {
+  struct DetachedMenuPresentation {
+    let location: NSPoint
+    let view: NSView?
+  }
+
   /// Login can reconfigure the menu bar for several run-loop turns after this
   /// LaunchAgent starts, so keep restoring transparency while it settles.
   static let appearanceRefreshDelays: [Duration] = [
@@ -126,6 +131,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     button.needsDisplay = true
   }
 
+  static func detachedMenuPresentation(
+    from button: NSStatusBarButton
+  ) -> DetachedMenuPresentation? {
+    guard let window = button.window else { return nil }
+    let anchorInButton = NSPoint(
+      x: button.bounds.minX,
+      y: button.isFlipped ? button.bounds.maxY : button.bounds.minY
+    )
+    let originInWindow = button.convert(anchorInButton, to: nil)
+    return DetachedMenuPresentation(
+      location: window.convertPoint(toScreen: originInWindow),
+      view: nil
+    )
+  }
+
   func menuWillOpen(_ menu: NSMenu) {
     applyTransparentAppearance()
   }
@@ -135,11 +155,23 @@ final class StatusItemController: NSObject, NSMenuDelegate {
   }
 
   @objc private func showStatusMenu(_ sender: NSStatusBarButton) {
-    guard let statusMenu else { return }
+    guard let statusMenu,
+      let presentation = Self.detachedMenuPresentation(from: sender)
+    else { return }
 
     applyTransparentAppearance(to: sender)
-    statusMenu.popUp(positioning: nil, at: .zero, in: sender)
-    applyTransparentAppearance(to: sender)
+    Task { @MainActor [weak self, weak sender, weak statusMenu] in
+      await Task.yield()
+      guard let self, let sender, let statusMenu else { return }
+
+      self.applyTransparentAppearance(to: sender)
+      statusMenu.popUp(
+        positioning: nil,
+        at: presentation.location,
+        in: presentation.view
+      )
+      self.applyTransparentAppearance(to: sender)
+    }
   }
 
   @objc private func lockNow() {
