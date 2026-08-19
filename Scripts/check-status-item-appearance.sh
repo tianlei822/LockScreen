@@ -1,7 +1,8 @@
 #!/bin/sh
 
-# Protect the transparent menu-bar item from regressions. An NSMenu attached
-# through NSStatusItem.menu re-enables AppKit's standard dark highlight path.
+# Keep the menu-bar item on AppKit's standard, template-image path. Historical
+# attempts to fight NSStatusBarButton drawing introduced intermittent backing
+# state instead of fixing it.
 
 set -eu
 
@@ -9,6 +10,7 @@ project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 source_file="$project_root/Sources/LockScreenApp/StatusItemController.swift"
 app_delegate_file="$project_root/Sources/LockScreenApp/AppDelegate.swift"
 window_presentation_file="$project_root/Sources/LockScreenApp/WindowPresentation.swift"
+info_plist="$project_root/Support/Info.plist"
 
 require_source() {
   if ! /usr/bin/grep -Fq -- "$1" "$source_file"; then
@@ -17,35 +19,41 @@ require_source() {
   fi
 }
 
-require_source 'image?.isTemplate = true'
-require_source 'button.isTransparent = true'
-require_source 'buttonCell.highlightsBy = []'
-require_source 'buttonCell.showsStateBy = []'
-require_source 'buttonCell.isHighlighted = false'
-require_source 'button.action = #selector(showStatusMenu(_:))'
-require_source 'let presentation = Self.detachedMenuPresentation(from: sender)'
-require_source 'await Task.yield()'
-require_source 'in: presentation.view'
-require_source 'private func applyTransparentAppearance'
-require_source 'static let appearanceRefreshDelays'
-require_source 'scheduleAppearanceRefresh()'
-require_source 'try await Task.sleep(for: delay)'
-require_source 'Self.configureTransparentAppearance(button)'
+require_source 'image.isTemplate = true'
+require_source 'button.image = image'
+require_source 'item.menu = menu'
+
+if [ "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$info_plist")" != "true" ]; then
+  echo 'LSUIElement must be true so LaunchServices registers a menu-bar app from process launch' >&2
+  exit 1
+fi
 
 if /usr/bin/grep -Eq '^[[:space:]]*button\.cell[[:space:]]*=' "$source_file"; then
   echo 'do not replace the AppKit-managed status-bar button cell' >&2
   exit 1
 fi
 
-if /usr/bin/grep -Eq '^[[:space:]]*item\.menu[[:space:]]*=' "$source_file"; then
-  echo 'do not attach the menu through NSStatusItem.menu; it restores the dark highlight' >&2
-  exit 1
-fi
-
-if /usr/bin/grep -Fq -- 'in: sender' "$source_file"; then
-  echo 'do not anchor the menu to NSStatusBarButton; it restores the dark highlight' >&2
-  exit 1
-fi
+for obsolete_pattern in \
+  'NSImageView(' \
+  'button.addSubview' \
+  'configureTransparentAppearance' \
+  'appearanceRefresh' \
+  'refreshAppearance' \
+  'cancelPendingRefresh' \
+  'button.isTransparent' \
+  'button.isBordered' \
+  'button.highlight(' \
+  'button.state' \
+  'button.cell' \
+  'buttonCell.highlightsBy' \
+  'statusMenu.popUp' \
+  'NSMenuDelegate'
+do
+  if /usr/bin/grep -Fq -- "$obsolete_pattern" "$source_file"; then
+    echo "obsolete status-item appearance logic found: $obsolete_pattern" >&2
+    exit 1
+  fi
+done
 
 if /usr/bin/grep -Fq -- 'NSApp.hide(nil)' "$app_delegate_file"; then
   echo 'do not hide the application while installing the background status item' >&2

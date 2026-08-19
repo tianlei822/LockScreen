@@ -5,6 +5,12 @@ import XCTest
 
 final class WindowPresentationTests: XCTestCase {
   @MainActor
+  func testLaunchActivationPolicyMatchesApplicationMode() {
+    XCTAssertEqual(AppDelegate.launchActivationPolicy(backgroundMode: true), .accessory)
+    XCTAssertEqual(AppDelegate.launchActivationPolicy(backgroundMode: false), .regular)
+  }
+
+  @MainActor
   func testBackgroundReopenPresentsRitualInsteadOfOpeningBootstrapWindow() {
     XCTAssertTrue(AppDelegate.shouldPresentRitualOnReopen(backgroundMode: true))
     XCTAssertFalse(AppDelegate.shouldPresentRitualOnReopen(backgroundMode: false))
@@ -120,56 +126,16 @@ final class WindowPresentationTests: XCTestCase {
   }
 
   @MainActor
-  func testStatusItemAppearanceRefreshPreservesAppKitCell() throws {
+  func testStatusItemUsesAStandardTemplateImageButton() {
     let button = NSStatusBarButton(
       frame: NSRect(x: 0, y: 0, width: 24, height: 24)
     )
-    let cell = try XCTUnwrap(button.cell as? NSButtonCell)
-    let originalCell = button.cell
-    button.isTransparent = false
-    button.isBordered = true
-    cell.highlightsBy = [.changeBackgroundCellMask]
-    cell.showsStateBy = [.changeBackgroundCellMask]
-    cell.isHighlighted = true
-    button.state = .on
+    let image = NSImage(size: NSSize(width: 15, height: 15))
 
-    StatusItemController.configureTransparentAppearance(button)
+    StatusItemController.configureStandardButton(button, image: image)
 
-    XCTAssertTrue(button.cell === originalCell)
-    XCTAssertTrue(button.isTransparent)
-    XCTAssertFalse(button.isBordered)
-    XCTAssertTrue(cell.highlightsBy.isEmpty)
-    XCTAssertTrue(cell.showsStateBy.isEmpty)
-    XCTAssertFalse(cell.isHighlighted)
-    XCTAssertEqual(button.state, .off)
-  }
-
-  @MainActor
-  func testStatusMenuPresentationIsDetachedFromStatusBarButton() throws {
-    let window = NSWindow(
-      contentRect: NSRect(x: 320, y: 640, width: 24, height: 24),
-      styleMask: [.borderless],
-      backing: .buffered,
-      defer: false
-    )
-    let button = NSStatusBarButton(frame: window.contentView?.bounds ?? .zero)
-    window.contentView = button
-
-    let presentation = try XCTUnwrap(
-      StatusItemController.detachedMenuPresentation(from: button)
-    )
-
-    XCTAssertNil(presentation.view)
-    XCTAssertEqual(presentation.location.x, 320, accuracy: 0.001)
-    XCTAssertEqual(presentation.location.y, 640, accuracy: 0.001)
-  }
-
-  @MainActor
-  func testStatusItemAppearanceRefreshContinuesAfterTheNextRunLoop() {
-    XCTAssertGreaterThan(StatusItemController.appearanceRefreshDelays.count, 1)
-    XCTAssertTrue(
-      StatusItemController.appearanceRefreshDelays.contains { $0 >= .seconds(1) }
-    )
+    XCTAssertTrue(button.image === image)
+    XCTAssertTrue(image.isTemplate)
   }
 
   @MainActor

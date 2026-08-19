@@ -30,6 +30,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     backgroundMode
   }
 
+  static func launchActivationPolicy(
+    backgroundMode: Bool
+  ) -> NSApplication.ActivationPolicy {
+    backgroundMode ? .accessory : .regular
+  }
+
   private var screenObserver: NSObjectProtocol?
   private var workspaceObservers: [NSObjectProtocol] = []
   private var hotKey: GlobalHotKey?
@@ -46,11 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   )
 
   func applicationWillFinishLaunching(_ notification: Notification) {
-    guard AppConfiguration.backgroundMode else { return }
-
-    // Establish accessory/background semantics before SwiftUI creates its
-    // WindowGroup so the scene never receives an initial foreground frame.
-    NSApp.setActivationPolicy(.accessory)
+    // `LSUIElement` makes LaunchServices register the process as a menu-bar
+    // app from birth. Foreground previews opt back into regular app semantics.
+    NSApp.setActivationPolicy(
+      Self.launchActivationPolicy(backgroundMode: AppConfiguration.backgroundMode)
+    )
   }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -58,26 +64,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       forName: NSApplication.didChangeScreenParametersNotification,
       object: nil,
       queue: .main
-    ) { [weak self] _ in
-      Task { @MainActor [weak self] in
+    ) { _ in
+      Task { @MainActor in
         WindowPresentation.refreshScreenCovers()
-        self?.statusItemController.refreshAppearance()
       }
     }
 
     let workspaceCenter = NSWorkspace.shared.notificationCenter
     for name in Self.coverageRefreshNotifications {
       workspaceObservers.append(
-        workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-          Task { @MainActor [weak self] in
+        workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { _ in
+          Task { @MainActor in
             WindowPresentation.refreshScreenCovers()
-            self?.statusItemController.refreshAppearance()
           }
         })
     }
 
     if AppConfiguration.backgroundMode {
-      NSApp.setActivationPolicy(.accessory)
       for window in NSApp.windows {
         window.orderOut(nil)
       }
@@ -134,11 +137,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
   func applicationDidBecomeActive(_ notification: Notification) {
     WindowPresentation.reassertKiosk()
-    statusItemController.refreshAppearance()
   }
 
   func applicationDidResignActive(_ notification: Notification) {
-    statusItemController.refreshAppearance()
     Task { @MainActor in
       try? await Task.sleep(for: .milliseconds(250))
       WindowPresentation.reassertKiosk()
@@ -148,7 +149,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   func applicationWillTerminate(_ notification: Notification) {
     IdleSuppression.end()
     hotKey?.unregister()
-    statusItemController.cancelPendingRefresh()
     if let screenObserver {
       NotificationCenter.default.removeObserver(screenObserver)
     }

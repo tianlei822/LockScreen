@@ -1,3 +1,4 @@
+import Foundation
 import LockScreenCore
 import XCTest
 
@@ -29,5 +30,20 @@ final class AppConfigurationTests: XCTestCase {
       AppConfiguration.resolveInitialTheme(arguments: ["LockScreen", "--unknown"]),
       .solar
     )
+  }
+
+  func testPackagedAppRegistersAsAUIElementFromProcessLaunch() throws {
+    let projectRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let infoPlist = projectRoot.appending(path: "Support/Info.plist")
+    let data = try Data(contentsOf: infoPlist)
+    let values = try XCTUnwrap(
+      PropertyListSerialization.propertyList(from: data, format: nil)
+        as? [String: Any]
+    )
+
+    XCTAssertEqual(values["LSUIElement"] as? Bool, true)
   }
 }
