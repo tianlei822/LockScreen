@@ -5,6 +5,12 @@ import XCTest
 
 final class WindowPresentationTests: XCTestCase {
   @MainActor
+  func testBackgroundReopenPresentsRitualInsteadOfOpeningBootstrapWindow() {
+    XCTAssertTrue(AppDelegate.shouldPresentRitualOnReopen(backgroundMode: true))
+    XCTAssertFalse(AppDelegate.shouldPresentRitualOnReopen(backgroundMode: false))
+  }
+
+  @MainActor
   func testHiddenImmersiveWindowDoesNotSuppressPresentationRequest() {
     XCTAssertFalse(
       AppDelegate.shouldIgnorePresentationRequest(

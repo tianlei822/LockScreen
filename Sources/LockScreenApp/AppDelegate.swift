@@ -26,6 +26,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     !appIsHidden && windowIsVisible && windowIsImmersive
   }
 
+  static func shouldPresentRitualOnReopen(backgroundMode: Bool) -> Bool {
+    backgroundMode
+  }
+
   private var screenObserver: NSObjectProtocol?
   private var workspaceObservers: [NSObjectProtocol] = []
   private var hotKey: GlobalHotKey?
@@ -116,11 +120,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     WindowPresentation.enterImmersive(window)
   }
 
+  func applicationShouldHandleReopen(
+    _ sender: NSApplication,
+    hasVisibleWindows flag: Bool
+  ) -> Bool {
+    guard Self.shouldPresentRitualOnReopen(backgroundMode: AppConfiguration.backgroundMode)
+    else { return true }
+
+    presentRitual()
+    return false
+  }
+
   func applicationDidBecomeActive(_ notification: Notification) {
     WindowPresentation.reassertKiosk()
+    statusItemController.refreshAppearance()
   }
 
   func applicationDidResignActive(_ notification: Notification) {
+    statusItemController.refreshAppearance()
     Task { @MainActor in
       try? await Task.sleep(for: .milliseconds(250))
       WindowPresentation.reassertKiosk()
