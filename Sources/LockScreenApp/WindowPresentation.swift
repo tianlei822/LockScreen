@@ -120,11 +120,12 @@ enum WindowPresentation {
     IdleSuppression.end()
     renderActivity.retreat()
 
+    // The accessory policy and hidden window are sufficient. Hiding the whole
+    // application can make AppKit reapply a persistent status-item backing.
     window?.level = .normal
     window?.orderOut(nil)
     window?.alphaValue = 1
     NSApp.setActivationPolicy(.accessory)
-    NSApp.hide(nil)
   }
 
   static func fadeOut(_ window: NSWindow?) async {

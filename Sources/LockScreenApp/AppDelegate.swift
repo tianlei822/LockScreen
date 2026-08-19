@@ -81,7 +81,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
       for window in NSApp.windows {
         window.orderOut(nil)
       }
-      NSApp.hide(nil)
+      // Keep the application itself unhidden. Hiding it while AppKit installs
+      // the status item can leave the system-managed button backing pressed.
       statusItemController.install()
     }
 

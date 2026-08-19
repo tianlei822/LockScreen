@@ -7,6 +7,8 @@ set -eu
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 source_file="$project_root/Sources/LockScreenApp/StatusItemController.swift"
+app_delegate_file="$project_root/Sources/LockScreenApp/AppDelegate.swift"
+window_presentation_file="$project_root/Sources/LockScreenApp/WindowPresentation.swift"
 
 require_source() {
   if ! /usr/bin/grep -Fq -- "$1" "$source_file"; then
@@ -42,6 +44,16 @@ fi
 
 if /usr/bin/grep -Fq -- 'in: sender' "$source_file"; then
   echo 'do not anchor the menu to NSStatusBarButton; it restores the dark highlight' >&2
+  exit 1
+fi
+
+if /usr/bin/grep -Fq -- 'NSApp.hide(nil)' "$app_delegate_file"; then
+  echo 'do not hide the application while installing the background status item' >&2
+  exit 1
+fi
+
+if /usr/bin/grep -Fq -- 'NSApp.hide(nil)' "$window_presentation_file"; then
+  echo 'do not hide the application when retreating a status-item app' >&2
   exit 1
 fi
 
