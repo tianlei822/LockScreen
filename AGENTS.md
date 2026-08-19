@@ -21,6 +21,7 @@
 
 - The earlier detached-menu change `c5a6160` and later repaint/lifecycle workarounds were interim attempts, not the durable model; do not restore them. / 早期分离菜单提交 `c5a6160` 及后续重绘/生命周期补丁只是阶段性尝试，不是长期设计，禁止恢复。
 - The durable fix adds static `LSUIElement` registration and replaces the controller with the standard template-image/menu path. `Scripts/check-status-item-appearance.sh` guards this invariant and rejects the removed patterns. / 长期修复是静态声明 `LSUIElement`，并把控制器恢复为标准模板图/菜单实现；`Scripts/check-status-item-appearance.sh` 固化约束并拒绝已删除模式。
+- Verified on 2026-08-19 with the first signed LaunchAgent bootstrap: PID `30096` registered as `foreground=0 uiElement=1`, remained on its first run without exiting, and visual acceptance confirmed no black background after the menu closed. / 已于 2026-08-19 验证首次签名 LaunchAgent 启动：PID `30096` 注册为 `foreground=0 uiElement=1`，首次运行保持存活未退出，且人工确认菜单关闭后无黑底。
 - A system-drawn pressed background while the menu is open is normal. A background remaining after the menu closes is a regression. / 菜单打开时系统绘制的按压底色属于正常；菜单关闭后仍残留才是回归。
 
 ### Required verification / 必须验证
