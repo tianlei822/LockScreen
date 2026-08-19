@@ -43,7 +43,13 @@ enum WindowPresentation {
   }
 
   static func enterImmersive(_ sourceWindow: NSWindow) {
-    guard let screen = sourceWindow.screen ?? NSScreen.main else { return }
+    let screens = NSScreen.screens
+    let screenIndex = presentationScreenIndex(
+      frames: screens.map(\.frame),
+      pointerLocation: NSEvent.mouseLocation
+    )
+    guard let screen = screenIndex.map({ screens[$0] }) ?? sourceWindow.screen ?? NSScreen.main
+    else { return }
 
     // Accessory semantics plus a nonactivating panel let this system-style
     // overlay join other Spaces without activating and moving its owning app.
@@ -233,6 +239,27 @@ enum WindowPresentation {
     return panel
   }
 
+  static func presentationScreenIndex(
+    frames: [NSRect],
+    pointerLocation: NSPoint
+  ) -> Int? {
+    frames.firstIndex { $0.contains(pointerLocation) }
+  }
+
+  static func makeScreenCover(contentRect: NSRect) -> NSPanel {
+    let panel = NSPanel(
+      contentRect: contentRect,
+      styleMask: [.borderless, .nonactivatingPanel],
+      backing: .buffered,
+      defer: false
+    )
+    configureForImmersivePresentation(panel)
+    panel.backgroundColor = .black
+    panel.isOpaque = true
+    panel.contentView = NSHostingView(rootView: Color.black)
+    return panel
+  }
+
   static func configureForImmersivePresentation(_ window: NSWindow) {
     window.styleMask = [.borderless, .nonactivatingPanel]
     if let panel = window as? NSPanel {
@@ -249,19 +276,8 @@ enum WindowPresentation {
     dismissScreenCovers()
 
     for screen in NSScreen.screens where screen != covered {
-      let cover = NSWindow(
-        contentRect: screen.frame,
-        styleMask: [.borderless],
-        backing: .buffered,
-        defer: false
-      )
-      cover.level = .screenSaver
-      cover.backgroundColor = .black
-      cover.isOpaque = true
-      cover.hasShadow = false
-      cover.collectionBehavior = overlayCollectionBehavior
-      cover.contentView = NSHostingView(rootView: Color.black)
-      cover.orderFront(nil)
+      let cover = makeScreenCover(contentRect: screen.frame)
+      cover.orderFrontRegardless()
       screenCovers.append(cover)
     }
   }

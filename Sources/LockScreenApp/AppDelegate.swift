@@ -18,6 +18,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     !backgroundMode && !ritualIsImmersive
   }
 
+  static func shouldIgnorePresentationRequest(
+    appIsHidden: Bool,
+    windowIsVisible: Bool,
+    windowIsImmersive: Bool
+  ) -> Bool {
+    !appIsHidden && windowIsVisible && windowIsImmersive
+  }
+
   private var screenObserver: NSObjectProtocol?
   private var workspaceObservers: [NSObjectProtocol] = []
   private var hotKey: GlobalHotKey?
@@ -95,8 +103,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
   /// The configured shortcut (or the status menu): show the ritual and take over the screen.
   func presentRitual() {
-    guard let window = WindowPresentation.mainRitualWindow(),
-      !WindowPresentation.isImmersive(window)
+    guard let window = WindowPresentation.mainRitualWindow() else { return }
+    guard
+      !Self.shouldIgnorePresentationRequest(
+        appIsHidden: NSApp.isHidden,
+        windowIsVisible: window.occlusionState.contains(.visible),
+        windowIsImmersive: WindowPresentation.isImmersive(window)
+      )
     else { return }
 
     NSApp.unhide(nil)

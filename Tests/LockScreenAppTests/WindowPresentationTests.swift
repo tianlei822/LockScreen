@@ -5,6 +5,32 @@ import XCTest
 
 final class WindowPresentationTests: XCTestCase {
   @MainActor
+  func testHiddenImmersiveWindowDoesNotSuppressPresentationRequest() {
+    XCTAssertFalse(
+      AppDelegate.shouldIgnorePresentationRequest(
+        appIsHidden: true,
+        windowIsVisible: false,
+        windowIsImmersive: true
+      ))
+  }
+
+  @MainActor
+  func testPresentationTargetsTheScreenContainingThePointer() {
+    let frames = [
+      NSRect(x: 0, y: 0, width: 1_920, height: 1_080),
+      NSRect(x: 1_920, y: 0, width: 2_560, height: 1_440),
+    ]
+
+    XCTAssertEqual(
+      WindowPresentation.presentationScreenIndex(
+        frames: frames,
+        pointerLocation: NSPoint(x: 2_400, y: 700)
+      ),
+      1
+    )
+  }
+
+  @MainActor
   func testAppStaysAliveWhileAnImmersiveRitualReplacesTheSceneWindow() {
     XCTAssertFalse(
       AppDelegate.shouldTerminateAfterLastWindowClosed(
@@ -27,6 +53,21 @@ final class WindowPresentationTests: XCTestCase {
 
     XCTAssertTrue(panel.styleMask.contains(.nonactivatingPanel))
     XCTAssertTrue(panel.canBecomeKey)
+    XCTAssertTrue(panel.isFloatingPanel)
+    XCTAssertFalse(panel.hidesOnDeactivate)
+    XCTAssertEqual(panel.level, .screenSaver)
+    XCTAssertTrue(panel.collectionBehavior.contains(.canJoinAllSpaces))
+    XCTAssertTrue(panel.collectionBehavior.contains(.canJoinAllApplications))
+  }
+
+  @MainActor
+  func testSecondaryScreenCoverUsesANonactivatingPanel() {
+    let panel = WindowPresentation.makeScreenCover(
+      contentRect: NSRect(x: 0, y: 0, width: 320, height: 240)
+    )
+    defer { panel.close() }
+
+    XCTAssertTrue(panel.styleMask.contains(.nonactivatingPanel))
     XCTAssertTrue(panel.isFloatingPanel)
     XCTAssertFalse(panel.hidesOnDeactivate)
     XCTAssertEqual(panel.level, .screenSaver)
