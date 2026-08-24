@@ -66,10 +66,176 @@ struct FivePhaseOuterOrbitField: View {
           )
         )
       }
+
+      for index in 0..<8 {
+        let angle = Double(index) * 2 * .pi / 8 + time * 0.045
+        let pulse = 0.5 + 0.5 * sin(time * 2.45 - Double(index) * 0.78)
+        let orbitRadius = unit * 0.455
+        let nodeRadius = unit * 0.041 * (0.94 + CGFloat(pulse) * 0.12)
+        let nodeCenter = CGPoint(
+          x: center.x + cos(angle) * orbitRadius,
+          y: center.y + sin(angle) * orbitRadius
+        )
+
+        drawPeripheralSeal(
+          in: &context,
+          center: nodeCenter,
+          radius: nodeRadius,
+          angle: angle,
+          index: index,
+          pulse: pulse
+        )
+      }
     }
     .frame(width: diameter, height: diameter)
     .blendMode(.plusLighter)
     .allowsHitTesting(false)
+  }
+
+  private func drawPeripheralSeal(
+    in context: inout GraphicsContext,
+    center: CGPoint,
+    radius: CGFloat,
+    angle: Double,
+    index: Int,
+    pulse: Double
+  ) {
+    let tint = index.isMultiple(of: 2) ? element.color : Color.white
+    let ring = Path(
+      ellipseIn: CGRect(
+        x: center.x - radius,
+        y: center.y - radius,
+        width: radius * 2,
+        height: radius * 2
+      )
+    )
+
+    var glow = context
+    glow.addFilter(.blur(radius: 3 + CGFloat(pulse) * 4))
+    glow.stroke(
+      ring,
+      with: .color(element.color.opacity(0.08 + energy * 0.12 + pulse * 0.16)),
+      lineWidth: 3 + CGFloat(pulse) * 3
+    )
+
+    context.stroke(
+      ring,
+      with: .color(tint.opacity(0.24 + energy * 0.16 + pulse * 0.34)),
+      style: StrokeStyle(
+        lineWidth: 1.15 + CGFloat(pulse) * 0.65,
+        dash: [radius * 0.42, radius * 0.18]
+      )
+    )
+
+    let frameSides = [4, 6, 3, 8][index % 4]
+    context.stroke(
+      regularPolygon(
+        center: center,
+        radius: radius * 0.78,
+        sides: frameSides,
+        rotation: angle + (index.isMultiple(of: 2) ? .pi / 4 : 0)
+      ),
+      with: .color(element.color.opacity(0.22 + energy * 0.15 + pulse * 0.28)),
+      style: StrokeStyle(lineWidth: 0.85 + CGFloat(pulse) * 0.55, lineJoin: .miter)
+    )
+
+    context.stroke(
+      trigramPath(center: center, radius: radius * 0.58, angle: angle, index: index),
+      with: .color(Color.white.opacity(0.34 + energy * 0.16 + pulse * 0.42)),
+      style: StrokeStyle(
+        lineWidth: 0.9 + CGFloat(pulse) * 0.55,
+        lineCap: .square
+      )
+    )
+
+    let coreRadius = radius * (0.07 + CGFloat(pulse) * 0.045)
+    context.fill(
+      Path(
+        ellipseIn: CGRect(
+          x: center.x - coreRadius,
+          y: center.y - coreRadius,
+          width: coreRadius * 2,
+          height: coreRadius * 2
+        )
+      ),
+      with: .color(element.color.opacity(0.48 + energy * 0.2 + pulse * 0.25))
+    )
+  }
+
+  private func trigramPath(
+    center: CGPoint,
+    radius: CGFloat,
+    angle: Double,
+    index: Int
+  ) -> Path {
+    let patterns = [
+      [true, true, true], [false, true, true], [true, false, true], [false, false, true],
+      [true, true, false], [false, true, false], [true, false, false], [false, false, false],
+    ]
+    let radial = CGPoint(x: cos(angle), y: sin(angle))
+    let tangent = CGPoint(x: -sin(angle), y: cos(angle))
+
+    return Path { path in
+      for line in 0..<3 {
+        let rowOffset = CGFloat(line - 1) * radius * 0.48
+        let rowCenter = CGPoint(
+          x: center.x + radial.x * rowOffset,
+          y: center.y + radial.y * rowOffset
+        )
+        let half = radius * 0.62
+        let gap = radius * 0.13
+
+        if patterns[index][line] {
+          path.move(
+            to: CGPoint(
+              x: rowCenter.x - tangent.x * half,
+              y: rowCenter.y - tangent.y * half
+            )
+          )
+          path.addLine(
+            to: CGPoint(
+              x: rowCenter.x + tangent.x * half,
+              y: rowCenter.y + tangent.y * half
+            )
+          )
+        } else {
+          for side in [-1.0, 1.0] {
+            let side = CGFloat(side)
+            path.move(
+              to: CGPoint(
+                x: rowCenter.x + tangent.x * half * side,
+                y: rowCenter.y + tangent.y * half * side
+              )
+            )
+            path.addLine(
+              to: CGPoint(
+                x: rowCenter.x + tangent.x * gap * side,
+                y: rowCenter.y + tangent.y * gap * side
+              )
+            )
+          }
+        }
+      }
+    }
+  }
+
+  private func regularPolygon(
+    center: CGPoint,
+    radius: CGFloat,
+    sides: Int,
+    rotation: Double
+  ) -> Path {
+    Path { path in
+      for index in 0..<sides {
+        let angle = rotation + Double(index) * 2 * .pi / Double(sides)
+        let point = CGPoint(
+          x: center.x + cos(angle) * radius,
+          y: center.y + sin(angle) * radius
+        )
+        index == 0 ? path.move(to: point) : path.addLine(to: point)
+      }
+      path.closeSubpath()
+    }
   }
 }
 
@@ -659,7 +825,7 @@ struct FormationConstellation: View {
             latticeColor.opacity(0.1 + Double(3 - ring) * 0.035 + energy * 0.08)
           ),
           style: StrokeStyle(
-            lineWidth: (0.55 + CGFloat(ring.isMultiple(of: 2) ? 0.8 : 0.25))
+            lineWidth: (0.9 + CGFloat(ring.isMultiple(of: 2) ? 1.0 : 0.4))
               * (ring.isMultiple(of: 2) ? outwardBreath : inwardBreath),
             dash: ring == 2 ? [unit * 0.018, unit * 0.012] : []
           )
@@ -684,7 +850,7 @@ struct FormationConstellation: View {
           boundary,
           with: .color(latticeColor.opacity(0.12 + energy * 0.11)),
           style: StrokeStyle(
-            lineWidth: (sector.isMultiple(of: 2) ? 1.05 : 0.5)
+            lineWidth: (sector.isMultiple(of: 2) ? 1.5 : 0.8)
               * (sector.isMultiple(of: 2) ? outwardBreath : inwardBreath),
             dash: sector.isMultiple(of: 2) ? [] : [unit * 0.014, unit * 0.009]
           )
@@ -704,7 +870,7 @@ struct FormationConstellation: View {
             latticeColor.opacity(0.24 + Double(sector % 3) * 0.045 + energy * 0.12)
           ),
           style: StrokeStyle(
-            lineWidth: (2.4 + CGFloat(sector.isMultiple(of: 2) ? 0.9 : 0))
+            lineWidth: (3.2 + CGFloat(sector.isMultiple(of: 2) ? 1.2 : 0))
               * outwardBreath,
             lineCap: .butt
           )
@@ -729,7 +895,7 @@ struct FormationConstellation: View {
           polygon,
           with: .color(latticeColor.opacity(0.13 + Double(layer) * 0.05 + energy * 0.1)),
           style: StrokeStyle(
-            lineWidth: (layer == 0 ? 1.05 : 0.62)
+            lineWidth: (layer == 0 ? 1.5 : 0.9)
               * (layer == 0 ? inwardBreath : outwardBreath),
             lineJoin: .round
           )
@@ -756,7 +922,7 @@ struct FormationConstellation: View {
               .opacity(0.12 + energy * 0.13)
           ),
           style: StrokeStyle(
-            lineWidth: (triangle == 0 ? 0.65 : 1.05)
+            lineWidth: (triangle == 0 ? 1.0 : 1.5)
               * (triangle == 0 ? inwardBreath : outwardBreath),
             lineJoin: .round
           )
@@ -798,7 +964,7 @@ struct FormationConstellation: View {
               .opacity(0.16 + energy * 0.12)
           ),
           style: StrokeStyle(
-            lineWidth: (index.isMultiple(of: 5) ? 1.35 : 0.65)
+            lineWidth: (index.isMultiple(of: 5) ? 1.75 : 0.95)
               * (index.isMultiple(of: 5) ? outwardBreath : inwardBreath),
             lineCap: .round,
             lineJoin: .round
@@ -829,7 +995,7 @@ struct FormationConstellation: View {
           connector,
           with: .color(latticeColor.opacity(0.16 + energy * 0.14)),
           style: StrokeStyle(
-            lineWidth: (index.isMultiple(of: 2) ? 1.15 : 0.55)
+            lineWidth: (index.isMultiple(of: 2) ? 1.5 : 0.85)
               * (index.isMultiple(of: 2) ? outwardBreath : inwardBreath),
             dash: index.isMultiple(of: 2) ? [] : [unit * 0.012, unit * 0.008]
           )
@@ -848,7 +1014,7 @@ struct FormationConstellation: View {
             with: .color(
               latticeColor.opacity(0.22 + Double(1 - inset) * 0.14 + energy * 0.14)
             ),
-            lineWidth: (inset == 0 ? 1.15 : 0.55)
+            lineWidth: (inset == 0 ? 1.5 : 0.8)
               * (inset == 0 ? outwardBreath : inwardBreath)
           )
         }
@@ -885,7 +1051,7 @@ struct FormationConstellation: View {
         context.stroke(
           nodeGlyph,
           with: .color(Color.white.opacity(0.24 + energy * 0.18)),
-          style: StrokeStyle(lineWidth: 0.65 * inwardBreath, lineJoin: .round)
+          style: StrokeStyle(lineWidth: 1.0 * inwardBreath, lineJoin: .round)
         )
 
         if index.isMultiple(of: 2) {
@@ -898,7 +1064,7 @@ struct FormationConstellation: View {
           context.stroke(
             crystalFrame,
             with: .color(latticeColor.opacity(0.2 + energy * 0.14)),
-            style: StrokeStyle(lineWidth: 0.8 * outwardBreath, lineJoin: .miter)
+            style: StrokeStyle(lineWidth: 1.1 * outwardBreath, lineJoin: .miter)
           )
         }
       }
@@ -915,7 +1081,7 @@ struct FormationConstellation: View {
             )
           ),
           with: .color(latticeColor.opacity(0.28 - Double(ring) * 0.08 + energy * 0.14)),
-          lineWidth: (ring == 0 ? 1.2 : 0.7)
+          lineWidth: (ring == 0 ? 1.65 : 1.0)
             * (ring == 0 ? outwardBreath : inwardBreath)
         )
       }

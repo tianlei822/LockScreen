@@ -139,7 +139,8 @@ struct FormationDoorArtwork: View {
           starMap(diameter: diameter * 0.58, time: time, level: level)
             .rotationEffect(.degrees(time * 5 * speed))
 
-          sweepArc(diameter: diameter * 0.62, time: time * speed, speed: 40, span: 0.16, tint: cyan)
+          sweepArc(
+            diameter: diameter * 0.62, time: time * speed, speed: 40, span: 0.16, tint: cyan)
           sweepArc(
             diameter: diameter * 0.44, time: time * speed, speed: -28, span: 0.12, tint: jade)
 
@@ -150,7 +151,8 @@ struct FormationDoorArtwork: View {
           risingParticles(size: size, diameter: diameter, time: time, level: level)
 
           centerCore(
-            diameter: diameter, time: time, level: level, speed: speed, activationAge: activationAge
+            diameter: diameter, time: time, level: level, speed: speed,
+            activationAge: activationAge
           )
 
           FormationDisciplineLayer(

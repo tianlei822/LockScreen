@@ -38,7 +38,7 @@ struct FivePhaseSigil: View {
         .trim(from: 0.08, to: 0.82)
         .stroke(
           element.color.opacity(0.18 + energy * 0.24),
-          style: StrokeStyle(lineWidth: 0.8 + energy, lineCap: .round, dash: [2, 5])
+          style: StrokeStyle(lineWidth: 1.2 + energy, lineCap: .round, dash: [2, 5])
         )
         .rotationEffect(.degrees(time * (element.rawValue.isMultiple(of: 2) ? 18 : -18)))
 
@@ -52,7 +52,7 @@ struct FivePhaseSigil: View {
             path,
             with: .color(element.color.opacity(0.24 + energy * 0.25)),
             style: StrokeStyle(
-              lineWidth: 4 + CGFloat(index.isMultiple(of: 2) ? energy * 2 : energy),
+              lineWidth: 5 + CGFloat(index.isMultiple(of: 2) ? energy * 2.5 : energy * 1.5),
               lineCap: .round,
               lineJoin: .round
             )
@@ -62,7 +62,7 @@ struct FivePhaseSigil: View {
             path,
             with: .color(index == 0 ? Color.white.opacity(0.82) : element.color),
             style: StrokeStyle(
-              lineWidth: index == 0 ? 1.8 + energy : 1 + energy * 0.7,
+              lineWidth: index == 0 ? 2.35 + energy : 1.45 + energy * 0.8,
               lineCap: .round,
               lineJoin: .round
             )
