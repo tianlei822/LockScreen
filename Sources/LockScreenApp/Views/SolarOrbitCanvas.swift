@@ -1,12 +1,38 @@
 import SwiftUI
 
+enum SolarOrbitRenderPolicy {
+  /// The two depth layers bracket the sun and must commit the same timeline frame together.
+  static let rendersAsynchronously = false
+}
+
+enum SolarSatelliteDepth: Equatable {
+  case behindPlanet
+  case inFrontOfPlanet
+
+  init(angle: Double) {
+    self = sin(angle) > 0 ? .inFrontOfPlanet : .behindPlanet
+  }
+}
+
+enum SolarEarthRotation {
+  static func horizontalOffset(spin: Double, width: CGFloat) -> CGFloat {
+    let fullTurn = 2 * Double.pi
+    var wrappedSpin = spin.truncatingRemainder(dividingBy: fullTurn)
+    if wrappedSpin < 0 { wrappedSpin += fullTurn }
+    return -CGFloat(wrappedSpin / fullTurn) * width
+  }
+}
+
 struct SolarOrbitCanvas: View {
   let time: TimeInterval
   let center: CGPoint
   let planetDepth: SolarOrbitDepth
 
   var body: some View {
-    Canvas(opaque: false, rendersAsynchronously: true) { context, size in
+    Canvas(
+      opaque: false,
+      rendersAsynchronously: SolarOrbitRenderPolicy.rendersAsynchronously
+    ) { context, size in
       if planetDepth == .behindSun {
         drawNebula(context: context, size: size)
         drawStars(context: context, size: size)
@@ -389,6 +415,14 @@ struct SolarOrbitCanvas: View {
         height: radius * 2
       )
 
+      drawSatelliteOrbits(context: context, planet: planet, point: point, radius: radius)
+      drawSatellites(
+        context: context,
+        planet: planet,
+        point: point,
+        radius: radius,
+        depth: .behindPlanet
+      )
       drawAtmosphere(context: context, planet: planet, rect: planetRect)
       drawRings(context: context, planet: planet, point: point, radius: radius, front: false)
 
@@ -437,7 +471,13 @@ struct SolarOrbitCanvas: View {
       )
 
       drawRings(context: context, planet: planet, point: point, radius: radius, front: true)
-      drawSatellites(context: context, planet: planet, point: point, radius: radius)
+      drawSatellites(
+        context: context,
+        planet: planet,
+        point: point,
+        radius: radius,
+        depth: .inFrontOfPlanet
+      )
 
       let label = context.resolve(
         Text(planet.name.uppercased())
@@ -559,53 +599,168 @@ struct SolarOrbitCanvas: View {
   }
 
   private func drawEarth(context: inout GraphicsContext, rect: CGRect, spin: Double) {
-    let drift = CGFloat(sin(spin)) * rect.width * 0.09
-    var americas = Path()
-    americas.move(to: point(in: rect, x: 0.17, y: 0.2, dx: drift))
-    americas.addCurve(
-      to: point(in: rect, x: 0.34, y: 0.48, dx: drift),
-      control1: point(in: rect, x: 0.36, y: 0.16, dx: drift),
-      control2: point(in: rect, x: 0.4, y: 0.34, dx: drift)
-    )
-    americas.addCurve(
-      to: point(in: rect, x: 0.28, y: 0.82, dx: drift),
-      control1: point(in: rect, x: 0.24, y: 0.58, dx: drift),
-      control2: point(in: rect, x: 0.4, y: 0.69, dx: drift)
-    )
-    americas.addCurve(
-      to: point(in: rect, x: 0.17, y: 0.2, dx: drift),
-      control1: point(in: rect, x: 0.13, y: 0.66, dx: drift),
-      control2: point(in: rect, x: 0.08, y: 0.34, dx: drift)
-    )
-    context.fill(americas, with: .color(Color(red: 0.25, green: 0.5, blue: 0.22)))
+    let land = Color(red: 0.26, green: 0.53, blue: 0.22)
+    let highland = Color(red: 0.55, green: 0.61, blue: 0.28)
+    let coastline = Color(red: 0.66, green: 0.78, blue: 0.39)
+    let rotationOffset = SolarEarthRotation.horizontalOffset(spin: spin, width: rect.width)
 
-    var oldWorld = Path()
-    oldWorld.move(to: point(in: rect, x: 0.53, y: 0.23, dx: drift))
-    oldWorld.addCurve(
-      to: point(in: rect, x: 0.86, y: 0.4, dx: drift),
-      control1: point(in: rect, x: 0.66, y: 0.1, dx: drift),
-      control2: point(in: rect, x: 0.82, y: 0.22, dx: drift)
-    )
-    oldWorld.addCurve(
-      to: point(in: rect, x: 0.62, y: 0.78, dx: drift),
-      control1: point(in: rect, x: 0.74, y: 0.47, dx: drift),
-      control2: point(in: rect, x: 0.76, y: 0.72, dx: drift)
-    )
-    oldWorld.addCurve(
-      to: point(in: rect, x: 0.53, y: 0.23, dx: drift),
-      control1: point(in: rect, x: 0.48, y: 0.68, dx: drift),
-      control2: point(in: rect, x: 0.42, y: 0.36, dx: drift)
-    )
-    context.fill(oldWorld, with: .color(Color(red: 0.36, green: 0.57, blue: 0.24)))
+    func drawLand(_ path: Path, color: Color = land) {
+      context.fill(path, with: .color(color))
+      context.stroke(
+        path,
+        with: .color(coastline.opacity(0.62)),
+        lineWidth: max(0.28, rect.width * 0.012)
+      )
+    }
 
-    drawBands(
-      context: &context,
-      rect: rect,
-      colors: [.white.opacity(0.48), Color.cyan.opacity(0.26)],
-      count: 5,
-      spin: spin * 1.3,
-      widthScale: 0.025
-    )
+    for wrap in -1...2 {
+      let offset = rotationOffset + CGFloat(wrap) * rect.width
+
+      var northAmerica = Path()
+      northAmerica.move(to: point(in: rect, x: 0.08, y: 0.24, dx: offset))
+      northAmerica.addCurve(
+        to: point(in: rect, x: 0.39, y: 0.3, dx: offset),
+        control1: point(in: rect, x: 0.16, y: 0.13, dx: offset),
+        control2: point(in: rect, x: 0.34, y: 0.16, dx: offset)
+      )
+      northAmerica.addCurve(
+        to: point(in: rect, x: 0.29, y: 0.5, dx: offset),
+        control1: point(in: rect, x: 0.42, y: 0.36, dx: offset),
+        control2: point(in: rect, x: 0.32, y: 0.42, dx: offset)
+      )
+      northAmerica.addCurve(
+        to: point(in: rect, x: 0.08, y: 0.24, dx: offset),
+        control1: point(in: rect, x: 0.18, y: 0.51, dx: offset),
+        control2: point(in: rect, x: 0.09, y: 0.39, dx: offset)
+      )
+      drawLand(northAmerica)
+
+      var southAmerica = Path()
+      southAmerica.move(to: point(in: rect, x: 0.29, y: 0.46, dx: offset))
+      southAmerica.addCurve(
+        to: point(in: rect, x: 0.37, y: 0.69, dx: offset),
+        control1: point(in: rect, x: 0.42, y: 0.5, dx: offset),
+        control2: point(in: rect, x: 0.42, y: 0.58, dx: offset)
+      )
+      southAmerica.addCurve(
+        to: point(in: rect, x: 0.28, y: 0.9, dx: offset),
+        control1: point(in: rect, x: 0.34, y: 0.78, dx: offset),
+        control2: point(in: rect, x: 0.3, y: 0.86, dx: offset)
+      )
+      southAmerica.addCurve(
+        to: point(in: rect, x: 0.29, y: 0.46, dx: offset),
+        control1: point(in: rect, x: 0.19, y: 0.73, dx: offset),
+        control2: point(in: rect, x: 0.2, y: 0.55, dx: offset)
+      )
+      drawLand(southAmerica, color: Color(red: 0.22, green: 0.49, blue: 0.2))
+
+      var eurasia = Path()
+      eurasia.move(to: point(in: rect, x: 0.47, y: 0.27, dx: offset))
+      eurasia.addCurve(
+        to: point(in: rect, x: 0.94, y: 0.34, dx: offset),
+        control1: point(in: rect, x: 0.63, y: 0.12, dx: offset),
+        control2: point(in: rect, x: 0.88, y: 0.18, dx: offset)
+      )
+      eurasia.addCurve(
+        to: point(in: rect, x: 0.67, y: 0.49, dx: offset),
+        control1: point(in: rect, x: 0.88, y: 0.47, dx: offset),
+        control2: point(in: rect, x: 0.76, y: 0.4, dx: offset)
+      )
+      eurasia.addCurve(
+        to: point(in: rect, x: 0.47, y: 0.27, dx: offset),
+        control1: point(in: rect, x: 0.58, y: 0.54, dx: offset),
+        control2: point(in: rect, x: 0.43, y: 0.4, dx: offset)
+      )
+      drawLand(eurasia, color: highland)
+
+      var africa = Path()
+      africa.move(to: point(in: rect, x: 0.56, y: 0.43, dx: offset))
+      africa.addCurve(
+        to: point(in: rect, x: 0.75, y: 0.5, dx: offset),
+        control1: point(in: rect, x: 0.66, y: 0.4, dx: offset),
+        control2: point(in: rect, x: 0.74, y: 0.44, dx: offset)
+      )
+      africa.addCurve(
+        to: point(in: rect, x: 0.62, y: 0.79, dx: offset),
+        control1: point(in: rect, x: 0.74, y: 0.64, dx: offset),
+        control2: point(in: rect, x: 0.68, y: 0.74, dx: offset)
+      )
+      africa.addCurve(
+        to: point(in: rect, x: 0.56, y: 0.43, dx: offset),
+        control1: point(in: rect, x: 0.52, y: 0.67, dx: offset),
+        control2: point(in: rect, x: 0.48, y: 0.51, dx: offset)
+      )
+      drawLand(africa, color: Color(red: 0.61, green: 0.55, blue: 0.26))
+
+      var australia = Path()
+      australia.addRoundedRect(
+        in: CGRect(
+          x: rect.minX + rect.width * 0.78 + offset,
+          y: rect.minY + rect.height * 0.66,
+          width: rect.width * 0.17,
+          height: rect.height * 0.12
+        ),
+        cornerSize: CGSize(width: rect.width * 0.05, height: rect.height * 0.04)
+      )
+      drawLand(australia, color: Color(red: 0.55, green: 0.49, blue: 0.23))
+
+      context.fill(
+        Path(
+          ellipseIn: CGRect(
+            x: rect.minX + rect.width * 0.43 + offset,
+            y: rect.minY + rect.height * 0.11,
+            width: rect.width * 0.12,
+            height: rect.height * 0.13
+          )
+        ),
+        with: .color(Color(red: 0.72, green: 0.82, blue: 0.7).opacity(0.92))
+      )
+    }
+
+    let cloudOffset = SolarEarthRotation.horizontalOffset(spin: spin * 1.08, width: rect.width)
+    for wrap in -1...2 {
+      let offset = cloudOffset + CGFloat(wrap) * rect.width
+      for (index, latitude) in [0.3, 0.53, 0.7].enumerated() {
+        var cloud = Path()
+        cloud.move(
+          to: point(
+            in: rect,
+            x: 0.02 + CGFloat(index) * 0.13,
+            y: CGFloat(latitude),
+            dx: offset
+          )
+        )
+        cloud.addCurve(
+          to: point(
+            in: rect,
+            x: 0.56 + CGFloat(index) * 0.11,
+            y: CGFloat(latitude) - 0.025,
+            dx: offset
+          ),
+          control1: point(
+            in: rect,
+            x: 0.19 + CGFloat(index) * 0.12,
+            y: CGFloat(latitude) - 0.07,
+            dx: offset
+          ),
+          control2: point(
+            in: rect,
+            x: 0.4 + CGFloat(index) * 0.1,
+            y: CGFloat(latitude) + 0.06,
+            dx: offset
+          )
+        )
+        context.stroke(
+          cloud,
+          with: .color(Color.white.opacity(index == 1 ? 0.5 : 0.38)),
+          style: StrokeStyle(
+            lineWidth: max(0.42, rect.width * (index == 1 ? 0.035 : 0.025)),
+            lineCap: .round
+          )
+        )
+      }
+    }
+
     context.fill(
       Path(
         ellipseIn: CGRect(
@@ -616,6 +771,17 @@ struct SolarOrbitCanvas: View {
         )
       ),
       with: .color(Color.white.opacity(0.78))
+    )
+    context.fill(
+      Path(
+        ellipseIn: CGRect(
+          x: rect.minX + rect.width * 0.17,
+          y: rect.maxY - rect.height * 0.09,
+          width: rect.width * 0.66,
+          height: rect.height * 0.09
+        )
+      ),
+      with: .color(Color.white.opacity(0.52))
     )
   }
 
@@ -770,71 +936,185 @@ struct SolarOrbitCanvas: View {
     }
   }
 
-  private func drawSatellites(
+  private func drawSatelliteOrbits(
     context: GraphicsContext,
     planet: SolarPlanet,
     point: CGPoint,
     radius: CGFloat
   ) {
-    if planet.name == "Earth" {
-      let orbitRadius = radius * 1.75
+    for satellite in satellites(for: planet) {
+      let orbitRadius = radius * satellite.orbitScale
       context.stroke(
         Path(
           ellipseIn: CGRect(
             x: point.x - orbitRadius,
-            y: point.y - orbitRadius * 0.28,
+            y: point.y - orbitRadius * satellite.verticalScale,
             width: orbitRadius * 2,
-            height: orbitRadius * 0.56
+            height: orbitRadius * satellite.verticalScale * 2
           )
         ),
-        with: .color(Color.white.opacity(0.13)),
-        lineWidth: 0.45
+        with: .color(Color.white.opacity(0.075)),
+        lineWidth: 0.38
       )
-      let angle = time * 0.72
+    }
+  }
+
+  private func drawSatellites(
+    context: GraphicsContext,
+    planet: SolarPlanet,
+    point: CGPoint,
+    radius: CGFloat,
+    depth: SolarSatelliteDepth
+  ) {
+    for satellite in satellites(for: planet) {
+      let angle = time * satellite.speed + satellite.phase
+      guard SolarSatelliteDepth(angle: angle) == depth else { continue }
+
+      let orbitRadius = radius * satellite.orbitScale
       let moon = CGPoint(
         x: point.x + cos(angle) * orbitRadius,
-        y: point.y + sin(angle) * orbitRadius * 0.28
+        y: point.y + sin(angle) * orbitRadius * satellite.verticalScale
       )
-      let moonRadius = max(1, radius * 0.12)
+      let moonRadius = max(satellite.minimumRadius, radius * satellite.radiusScale)
+      let moonRect = CGRect(
+        x: moon.x - moonRadius,
+        y: moon.y - moonRadius,
+        width: moonRadius * 2,
+        height: moonRadius * 2
+      )
       context.fill(
-        Path(
-          ellipseIn: CGRect(
-            x: moon.x - moonRadius,
-            y: moon.y - moonRadius,
-            width: moonRadius * 2,
-            height: moonRadius * 2
-          )
-        ),
+        Path(ellipseIn: moonRect),
         with: .radialGradient(
-          Gradient(colors: [.white, Color.gray]),
-          center: CGPoint(x: moon.x - moonRadius * 0.3, y: moon.y - moonRadius * 0.3),
+          Gradient(colors: [satellite.highlight, satellite.color, satellite.shadow]),
+          center: CGPoint(x: moon.x - moonRadius * 0.34, y: moon.y - moonRadius * 0.34),
           startRadius: 0,
           endRadius: moonRadius * 1.5
         )
       )
-    } else if planet.name == "Jupiter" {
-      let orbitalRadii: [CGFloat] = [1.45, 1.76, 2.08, 2.42]
-      for (index, orbitScale) in orbitalRadii.enumerated() {
-        let angle = time * (0.42 + Double(index) * 0.09) + Double(index) * 1.7
-        let moon = CGPoint(
-          x: point.x + cos(angle) * radius * orbitScale,
-          y: point.y + sin(angle) * radius * orbitScale * 0.22
+      context.stroke(
+        Path(ellipseIn: moonRect.insetBy(dx: 0.15, dy: 0.15)),
+        with: .color(Color.white.opacity(0.22)),
+        lineWidth: 0.3
+      )
+    }
+  }
+
+  private func satellites(for planet: SolarPlanet) -> [SolarSatellite] {
+    switch planet.name {
+    case "Earth":
+      return [
+        SolarSatellite(
+          orbitScale: 1.8,
+          verticalScale: 0.3,
+          speed: 0.34,
+          phase: 0,
+          radiusScale: 0.16,
+          minimumRadius: 1.15,
+          color: Color(red: 0.68, green: 0.69, blue: 0.68),
+          highlight: Color(red: 0.95, green: 0.96, blue: 0.94),
+          shadow: Color(red: 0.18, green: 0.19, blue: 0.2)
         )
-        let moonRadius = max(0.7, radius * (0.055 + CGFloat(index) * 0.008))
-        context.fill(
-          Path(
-            ellipseIn: CGRect(
-              x: moon.x - moonRadius,
-              y: moon.y - moonRadius,
-              width: moonRadius * 2,
-              height: moonRadius * 2
-            )
-          ),
-          with: .color(
-            (index.isMultiple(of: 2) ? Color.white : Color.orange).opacity(0.78)
-          )
+      ]
+    case "Mars":
+      return [
+        SolarSatellite(
+          orbitScale: 1.5,
+          verticalScale: 0.26,
+          speed: 0.82,
+          phase: 0.6,
+          radiusScale: 0.07,
+          minimumRadius: 0.62,
+          color: Color(red: 0.55, green: 0.44, blue: 0.36),
+          highlight: Color(red: 0.8, green: 0.7, blue: 0.59),
+          shadow: Color(red: 0.2, green: 0.13, blue: 0.1)
+        ),
+        SolarSatellite(
+          orbitScale: 1.95,
+          verticalScale: 0.24,
+          speed: 0.51,
+          phase: 2.4,
+          radiusScale: 0.06,
+          minimumRadius: 0.55,
+          color: Color(red: 0.49, green: 0.41, blue: 0.36),
+          highlight: Color(red: 0.75, green: 0.67, blue: 0.59),
+          shadow: Color(red: 0.17, green: 0.12, blue: 0.1)
+        ),
+      ]
+    case "Jupiter":
+      let colors = [
+        Color(red: 0.86, green: 0.75, blue: 0.55),
+        Color(red: 0.86, green: 0.7, blue: 0.42),
+        Color(red: 0.66, green: 0.7, blue: 0.67),
+        Color(red: 0.56, green: 0.48, blue: 0.39),
+      ]
+      return [1.45, 1.76, 2.08, 2.42].enumerated().map { index, orbitScale in
+        SolarSatellite(
+          orbitScale: CGFloat(orbitScale),
+          verticalScale: 0.22,
+          speed: 0.28 + Double(index) * 0.055,
+          phase: Double(index) * 1.7,
+          radiusScale: 0.062 + CGFloat(index) * 0.008,
+          minimumRadius: 0.72,
+          color: colors[index],
+          highlight: colors[index].opacity(0.95),
+          shadow: Color.black.opacity(0.82)
         )
       }
+    case "Saturn":
+      return [
+        SolarSatellite(
+          orbitScale: 2.5,
+          verticalScale: 0.25,
+          speed: 0.2,
+          phase: 1.1,
+          radiusScale: 0.1,
+          minimumRadius: 0.82,
+          color: Color(red: 0.72, green: 0.52, blue: 0.3),
+          highlight: Color(red: 0.91, green: 0.72, blue: 0.48),
+          shadow: Color(red: 0.25, green: 0.14, blue: 0.08)
+        ),
+        SolarSatellite(
+          orbitScale: 2.05,
+          verticalScale: 0.25,
+          speed: 0.27,
+          phase: 3.2,
+          radiusScale: 0.062,
+          minimumRadius: 0.58,
+          color: Color(red: 0.72, green: 0.69, blue: 0.61),
+          highlight: Color(red: 0.91, green: 0.88, blue: 0.79),
+          shadow: Color(red: 0.25, green: 0.23, blue: 0.2)
+        ),
+      ]
+    case "Uranus":
+      return [
+        SolarSatellite(
+          orbitScale: 1.85,
+          verticalScale: 0.34,
+          speed: 0.24,
+          phase: 2.1,
+          radiusScale: 0.07,
+          minimumRadius: 0.62,
+          color: Color(red: 0.68, green: 0.72, blue: 0.72),
+          highlight: Color(red: 0.9, green: 0.94, blue: 0.93),
+          shadow: Color(red: 0.2, green: 0.24, blue: 0.25)
+        )
+      ]
+    case "Neptune":
+      return [
+        SolarSatellite(
+          orbitScale: 1.9,
+          verticalScale: 0.29,
+          speed: -0.22,
+          phase: 0.8,
+          radiusScale: 0.075,
+          minimumRadius: 0.64,
+          color: Color(red: 0.64, green: 0.67, blue: 0.65),
+          highlight: Color(red: 0.9, green: 0.92, blue: 0.89),
+          shadow: Color(red: 0.17, green: 0.2, blue: 0.2)
+        )
+      ]
+    default:
+      return []
     }
   }
 
@@ -922,12 +1202,12 @@ private struct SolarPlanet {
       surface: .cloudy, spinSpeed: -0.12,
       atmosphere: Color(red: 0.93, green: 0.64, blue: 0.31), ring: nil),
     SolarPlanet(
-      name: "Earth", orbit: 0.25, speed: 0.1, phase: 2.7, radius: 0.013,
+      name: "Earth", orbit: 0.25, speed: 0.1, phase: 2.7, radius: 0.015,
       color: Color(red: 0.08, green: 0.35, blue: 0.67),
       accent: Color(red: 0.3, green: 0.5, blue: 0.25),
       highlight: Color(red: 0.32, green: 0.67, blue: 0.96),
       shadow: Color(red: 0.018, green: 0.08, blue: 0.22),
-      surface: .earth, spinSpeed: 1.35,
+      surface: .earth, spinSpeed: 0.32,
       atmosphere: Color(red: 0.2, green: 0.68, blue: 1), ring: nil),
     SolarPlanet(
       name: "Mars", orbit: 0.31, speed: 0.08, phase: 4.2, radius: 0.011,
@@ -982,6 +1262,18 @@ private enum SolarPlanetSurface {
 private enum SolarRingStyle {
   case saturn
   case uranus
+}
+
+private struct SolarSatellite {
+  let orbitScale: CGFloat
+  let verticalScale: CGFloat
+  let speed: Double
+  let phase: Double
+  let radiusScale: CGFloat
+  let minimumRadius: CGFloat
+  let color: Color
+  let highlight: Color
+  let shadow: Color
 }
 
 func detailHash(_ value: Double) -> CGFloat {
