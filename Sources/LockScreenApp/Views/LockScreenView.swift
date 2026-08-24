@@ -40,7 +40,8 @@ struct LockScreenView: View {
           formationEnergy: flow.formationEnergy,
           formationTrajectory: flow.formationTrajectory,
           woodKnockCount: flow.woodKnockCount,
-          onSolarActivate: activateSolarSystem
+          onSolarActivate: activateSolarSystem,
+          onLandscapeActivate: activateInkLandscape
         )
         .frame(width: proxy.size.width, height: proxy.size.height)
         .ignoresSafeArea()
@@ -80,6 +81,8 @@ struct LockScreenView: View {
             WoodDoorRingView(knockCount: flow.woodKnockCount, onKnock: knockWoodDoor)
               .ignoresSafeArea()
           case .formation:
+            EmptyView()
+          case .landscape:
             EmptyView()
           case .vault:
             VaultPasscodeView(
@@ -274,6 +277,10 @@ struct LockScreenView: View {
 
   private func traceFormation(_ score: Double) {
     coordinator.traceFormation(score)
+  }
+
+  private func activateInkLandscape() {
+    coordinator.activateInkLandscape()
   }
 
   private func submitVaultPasscode(_ passcode: String) -> VaultPasscodeResult {

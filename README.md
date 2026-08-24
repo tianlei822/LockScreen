@@ -27,6 +27,10 @@ swift run LockScreen --windowed --solar
 # 直接以窗口模式预览阵法主题。
 swift run LockScreen --windowed --formation
 
+# Open Ink Landscape directly as its own top-level theme.
+# 直接以独立顶级主题打开水墨山水。
+swift run LockScreen --windowed --landscape
+
 # Open the vault directly. Its default ritual code is 1024.
 # 直接打开密码箱；默认仪式密码为 1024。
 swift run LockScreen --vault
@@ -86,11 +90,12 @@ TCC 权限连续性。可通过 `APPLE_SIGNING_IDENTITY` 指定其他证书；�
 
 ## Controls / 操作
 
-- Choose `Solar Atlas`, `Five-Phase Formation`, `Wooden Door`, or `Cipher Vault` in the upper-left corner. / 在左上角选择太阳星图、五行阵法、木门或密码箱。
+- Choose `Solar Atlas`, `Five-Phase Formation`, `Wooden Door`, `Ink Landscape`, or `Cipher Vault` in the upper-left corner. / 在左上角选择太阳星图、五行阵法、木门、水墨山水或密码箱。
 - Press `R` or use the upper-right reset button to restart the current ritual. / 按 `R` 或点击右上角重置按钮，重新开始当前仪式。
 - On `Solar Atlas`, double-click the sun. VoiceOver users can activate the named sun button once. / 在 `Solar Atlas` 中双击太阳；VoiceOver 用户可直接激活已命名的太阳按钮。
 - On `Wooden Door`, knock either brass ring three times. / 在 `Wooden Door` 中敲击任意黄铜门环三次。
-- On `Five-Phase Formation`, choose `Circle`, `Infinity`, or `Triangle`, then drag along the glowing track to charge it. Press `Return` for the keyboard-accessible channel action. / 在 `Five-Phase Formation` 中选择 `Circle`、`Infinity` 或 `Triangle`，然后沿发光轨迹拖动充能；也可按 `Return` 使用键盘触发。
+- On `Five-Phase Formation`, choose `Five Phases`, `Bagua Flow`, or `Thunder Seal`, then trace the glowing track. / 在 `Five-Phase Formation` 中选择“五行阵”、“八卦流转”或“雷霆法印”，然后沿发光轨迹描摹。
+- On `Ink Landscape`, click the fishing boat to leave the painting. / 在 `Ink Landscape` 中点击渔舟离开画境。
 - On `Cipher Vault`, enter the configured code with the keyboard or keypad, then press `Return` or the unlock key. Use the gear button to save a persistent 4–8 digit ritual code on this Mac; a valid `--passcode` overrides it for that launch only. The default is `1024`. Never use your macOS password. / 在 `Cipher Vault` 中使用键盘或数字键盘输入配置密码，再按 `Return` 或开锁键。可通过齿轮按钮在本机持久保存 4–8 位仪式密码；有效的 `--passcode` 仅覆盖当次启动。默认值为 `1024`，绝不能使用 macOS 系统密码。
 - After a successful ritual, the doors finish opening, the app hides immediately, and the previous workspace becomes active without an intermediate window. / 仪式成功后，门完成开启，应用立即隐藏并激活之前的工作页面，不再出现中间窗口。
 - Press `⇧⌘F` or use the upper-right button to toggle immersive/windowed mode. / 按 `⇧⌘F` 或点击右上角按钮切换沉浸/窗口模式。

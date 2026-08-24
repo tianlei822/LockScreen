@@ -10,8 +10,8 @@ final class LockFlowTests: XCTestCase {
     XCTAssertEqual(flow.formationTrajectory, .circle)
   }
 
-  func testGalleryOrderingStartsWithSolarAtlasThenThreeDistinctRituals() {
-    XCTAssertEqual(DoorTheme.allCases, [.solar, .formation, .wood, .vault])
+  func testGalleryAndFormationOrderingStayStable() {
+    XCTAssertEqual(DoorTheme.allCases, [.solar, .formation, .wood, .landscape, .vault])
     XCTAssertEqual(FormationTrajectory.allCases, [.circle, .infinity, .triangle])
   }
 
@@ -26,6 +26,20 @@ final class LockFlowTests: XCTestCase {
     var flow = LockFlow(theme: .formation)
 
     XCTAssertEqual(flow.activateSolarSystem(), .ignored)
+    XCTAssertEqual(flow.phase, .sealed)
+  }
+
+  func testInkLandscapeActivationStartsUnlocking() {
+    var flow = LockFlow(theme: .landscape)
+
+    XCTAssertEqual(flow.activateInkLandscape(), .completed)
+    XCTAssertEqual(flow.phase, .unlocking)
+  }
+
+  func testInkLandscapeActivationIsIgnoredForOtherThemes() {
+    var flow = LockFlow(theme: .wood)
+
+    XCTAssertEqual(flow.activateInkLandscape(), .ignored)
     XCTAssertEqual(flow.phase, .sealed)
   }
 

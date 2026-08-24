@@ -40,6 +40,16 @@ struct ThemePalette {
     secondaryText: Color(red: 0.51, green: 0.71, blue: 0.72)
   )
 
+  static let inkLandscape = ThemePalette(
+    backdrop: Color(red: 0.028, green: 0.032, blue: 0.031),
+    haze: Color(red: 0.15, green: 0.18, blue: 0.17),
+    accent: Color(red: 0.67, green: 0.72, blue: 0.69),
+    accentSoft: Color(red: 0.20, green: 0.27, blue: 0.26),
+    detail: Color(red: 0.82, green: 0.82, blue: 0.75),
+    primaryText: Color(red: 0.92, green: 0.90, blue: 0.82),
+    secondaryText: Color(red: 0.62, green: 0.64, blue: 0.60)
+  )
+
   static let vault = ThemePalette(
     backdrop: Color(red: 0.025, green: 0.032, blue: 0.038),
     haze: Color(red: 0.12, green: 0.16, blue: 0.18),
@@ -51,6 +61,29 @@ struct ThemePalette {
   )
 }
 
+enum ThemePaletteKind: Equatable {
+  case solar
+  case wood
+  case formation
+  case inkLandscape
+  case vault
+
+  var palette: ThemePalette {
+    switch self {
+    case .solar:
+      .solar
+    case .wood:
+      .wood
+    case .formation:
+      .formation
+    case .inkLandscape:
+      .inkLandscape
+    case .vault:
+      .vault
+    }
+  }
+}
+
 struct RitualDescriptor {
   let title: String
   let subtitle: String
@@ -60,6 +93,23 @@ struct RitualDescriptor {
 }
 
 extension DoorTheme {
+  var presentationPaletteKind: ThemePaletteKind {
+    switch self {
+    case .solar:
+      .solar
+    case .wood:
+      .wood
+    case .formation:
+      .formation
+    case .landscape:
+      .inkLandscape
+    case .vault:
+      .vault
+    }
+  }
+
+  var presentationPalette: ThemePalette { presentationPaletteKind.palette }
+
   var descriptor: RitualDescriptor {
     switch self {
     case .solar:
@@ -85,6 +135,14 @@ extension DoorTheme {
         symbolName: "seal.fill",
         launchArgument: "--formation",
         palette: .formation
+      )
+    case .landscape:
+      RitualDescriptor(
+        title: L10n.text("Ink Landscape"),
+        subtitle: L10n.text("Mountain · Water · Ink"),
+        symbolName: "mountain.2.fill",
+        launchArgument: "--landscape",
+        palette: .inkLandscape
       )
     case .vault:
       RitualDescriptor(

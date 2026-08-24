@@ -4,14 +4,12 @@ import SwiftUI
 /// A restrained foreground engraving shared by every door theme.
 /// It gives the screen edges physical depth without competing with the central ritual.
 struct ThresholdDetailOverlay: View {
-  let theme: DoorTheme
+  let palette: ThemePalette
   let isOpen: Bool
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
   @Environment(\.ritualMotionReduced) private var ritualMotionReduced
 
   var body: some View {
-    let palette = theme.palette
-
     TimelineView(
       .animation(
         minimumInterval: 1 / 20,

@@ -13,6 +13,7 @@
 "Change Vault ritual code" = "Change Vault ritual code";
 "Channel" = "Channel";
 "Channel the selected formation without dragging" = "Channel the selected formation without dragging";
+"CLICK THE BOAT · DEPART" = "CLICK THE BOAT · DEPART";
 "Choose door theme" = "Choose door theme";
 "Choose door theme; current theme is %@" = "Choose door theme; current theme is %@";
 "Cipher Vault" = "Cipher Vault";
@@ -39,7 +40,10 @@
 "Exit immersive mode" = "Exit immersive mode";
 "Exit immersive mode (⇧⌘F)" = "Exit immersive mode (⇧⌘F)";
 "Fire" = "Fire";
+"Fishing boat — click to leave the ink landscape" = "Fishing boat — click to leave the ink landscape";
 "Global Shortcut" = "Global Shortcut";
+"Ink Landscape" = "Ink Landscape";
+"Mountain · Water · Ink" = "Mountain · Water · Ink";
 "Five Phases cycle, %@ active" = "Five Phases cycle, %@ active";
 "Five Phases" = "Five Phases";
 "Five-Phase Formation" = "Five-Phase Formation";
@@ -52,6 +56,7 @@
 "LOCAL RITUAL ACCESS" = "LOCAL RITUAL ACCESS";
 "Lock Now" = "Lock Now";
 "Metal" = "Metal";
+"MOUNTAIN STILLNESS · WATER IN MOTION" = "MOUNTAIN STILLNESS · WATER IN MOTION";
 "NEW CODE" = "NEW CODE";
 "Oak · Brass · Ember" = "Oak · Brass · Ember";
 "open" = "open";

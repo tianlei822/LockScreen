@@ -13,6 +13,7 @@
 "Change Vault ritual code" = "更改保险库仪式密码";
 "Channel" = "引导";
 "Channel the selected formation without dragging" = "无需拖动，直接引导所选阵法";
+"CLICK THE BOAT · DEPART" = "点击渔舟 · 离境";
 "Choose door theme" = "选择门扉主题";
 "Choose door theme; current theme is %@" = "选择门扉主题；当前为 %@";
 "Cipher Vault" = "密码保险库";
@@ -39,7 +40,10 @@
 "Exit immersive mode" = "退出沉浸模式";
 "Exit immersive mode (⇧⌘F)" = "退出沉浸模式（⇧⌘F）";
 "Fire" = "火";
+"Fishing boat — click to leave the ink landscape" = "渔舟——点击离开水墨山水";
 "Global Shortcut" = "全局快捷键";
+"Ink Landscape" = "水墨山水";
+"Mountain · Water · Ink" = "山水 · 渔舟 · 墨韵";
 "Five Phases cycle, %@ active" = "五行循环，当前为 %@";
 "Five Phases" = "五行阵";
 "Five-Phase Formation" = "五行阵法";
@@ -52,6 +56,7 @@
 "LOCAL RITUAL ACCESS" = "本机仪式访问";
 "Lock Now" = "立即锁定";
 "Metal" = "金";
+"MOUNTAIN STILLNESS · WATER IN MOTION" = "山静 · 水行 · 一舟入境";
 "NEW CODE" = "新密码";
 "Oak · Brass · Ember" = "橡木 · 黄铜 · 余烬";
 "open" = "已开启";

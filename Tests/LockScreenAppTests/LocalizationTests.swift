@@ -50,6 +50,28 @@ final class LocalizationTests: XCTestCase {
     )
   }
 
+  func testInkLandscapeThemeHasSimplifiedChineseCopy() {
+    XCTAssertEqual(
+      L10n.text("Ink Landscape", locale: Locale(identifier: "zh-Hans")),
+      "水墨山水"
+    )
+    XCTAssertEqual(
+      L10n.text("MOUNTAIN STILLNESS · WATER IN MOTION", locale: Locale(identifier: "zh-Hans")),
+      "山静 · 水行 · 一舟入境"
+    )
+    XCTAssertEqual(
+      L10n.text("CLICK THE BOAT · DEPART", locale: Locale(identifier: "zh-Hans")),
+      "点击渔舟 · 离境"
+    )
+    XCTAssertEqual(
+      L10n.text(
+        "Fishing boat — click to leave the ink landscape",
+        locale: Locale(identifier: "zh-Hans")
+      ),
+      "渔舟——点击离开水墨山水"
+    )
+  }
+
   private func writeBundleInfo(
     identifier: String,
     packageType: String,

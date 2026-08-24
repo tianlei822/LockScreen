@@ -71,6 +71,11 @@ final class RitualCoordinator: ObservableObject {
     beginUnlockSequence()
   }
 
+  func activateInkLandscape() {
+    guard flow.activateInkLandscape() == .completed else { return }
+    beginUnlockSequence()
+  }
+
   func knockWoodDoor() {
     guard flow.knockWoodDoor() == .completed else { return }
     beginUnlockSequence()

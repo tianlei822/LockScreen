@@ -13,6 +13,7 @@ struct DoorStageView: View {
   let formationTrajectory: FormationTrajectory
   let woodKnockCount: Int
   let onSolarActivate: () -> Void
+  let onLandscapeActivate: () -> Void
 
   @State private var rendersSplitDoors = false
   @State private var splitDoorsOpen = false
@@ -23,9 +24,10 @@ struct DoorStageView: View {
   var body: some View {
     GeometryReader { proxy in
       let size = proxy.size
+      let palette = theme.presentationPalette
 
       ZStack {
-        PortalRevealView(theme: theme, isOpen: isOpen)
+        PortalRevealView(theme: theme, palette: palette, isOpen: isOpen)
 
         if theme == .solar {
           SolarSystemArtwork(isActivated: isOpen, onActivate: onSolarActivate)
@@ -66,7 +68,8 @@ struct DoorStageView: View {
             phase: phase,
             formationEnergy: formationEnergy,
             formationTrajectory: formationTrajectory,
-            woodKnockCount: woodKnockCount
+            woodKnockCount: woodKnockCount,
+            onLandscapeActivate: onLandscapeActivate
           )
           .frame(width: size.width, height: size.height)
           .transition(.identity)
@@ -77,9 +80,9 @@ struct DoorStageView: View {
           .fill(
             LinearGradient(
               colors: [
-                theme.palette.accentSoft.opacity(0),
-                theme.palette.accent.opacity(0.9),
-                theme.palette.accentSoft.opacity(0),
+                palette.accentSoft.opacity(0),
+                palette.accent.opacity(0.9),
+                palette.accentSoft.opacity(0),
               ],
               startPoint: .top,
               endPoint: .bottom
@@ -92,7 +95,7 @@ struct DoorStageView: View {
           .blendMode(.plusLighter)
           .allowsHitTesting(false)
 
-        ThresholdDetailOverlay(theme: theme, isOpen: isOpen)
+        ThresholdDetailOverlay(palette: palette, isOpen: isOpen)
       }
       .background(Color.black)
       .clipped()
@@ -101,7 +104,9 @@ struct DoorStageView: View {
       }
     }
     .animation(.easeInOut(duration: ritualMotionReduced ? 0.2 : 1.45), value: isOpen)
-    .accessibilityElement(children: theme == .solar ? .contain : .ignore)
+    .accessibilityElement(
+      children: theme == .solar || theme == .formation || theme == .landscape ? .contain : .ignore
+    )
     .accessibilityLabel(
       L10n.format(
         "%@, %@",
@@ -138,7 +143,8 @@ struct DoorStageView: View {
       phase: phase,
       formationEnergy: formationEnergy,
       formationTrajectory: formationTrajectory,
-      woodKnockCount: woodKnockCount
+      woodKnockCount: woodKnockCount,
+      onLandscapeActivate: onLandscapeActivate
     )
     .frame(width: fullSize.width, height: fullSize.height)
     .offset(x: side == .left ? fullSize.width / 4 : -fullSize.width / 4)
@@ -153,6 +159,7 @@ private struct DoorArtworkView: View {
   let formationEnergy: Double
   let formationTrajectory: FormationTrajectory
   let woodKnockCount: Int
+  let onLandscapeActivate: () -> Void
 
   @ViewBuilder
   var body: some View {
@@ -166,6 +173,11 @@ private struct DoorArtworkView: View {
         energy: formationEnergy,
         isActivated: phase != .sealed,
         trajectory: formationTrajectory
+      )
+    case .landscape:
+      InkLandscapeArtwork(
+        isActivated: phase != .sealed,
+        onBoatActivate: onLandscapeActivate
       )
     case .vault:
       VaultDoorArtwork()
@@ -200,13 +212,12 @@ private struct DoorLeafMotionModifier: ViewModifier {
 
 private struct PortalRevealView: View {
   let theme: DoorTheme
+  let palette: ThemePalette
   let isOpen: Bool
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
   @Environment(\.ritualMotionReduced) private var ritualMotionReduced
 
   var body: some View {
-    let palette = theme.palette
-
     TimelineView(
       .animation(
         minimumInterval: 1 / 24,
@@ -275,6 +286,8 @@ private struct PortalRevealView: View {
       "✦"
     case .formation:
       "◇"
+    case .landscape:
+      "山"
     case .vault:
       "▣"
     }

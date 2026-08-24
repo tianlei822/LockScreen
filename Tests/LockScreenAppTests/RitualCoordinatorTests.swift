@@ -46,4 +46,24 @@ final class RitualCoordinatorTests: XCTestCase {
     XCTAssertEqual(coordinator.flow.phase, .sealed)
     XCTAssertEqual(coordinator.flow.woodKnockCount, 0)
   }
+
+  @MainActor
+  func testInkLandscapeBoatActivationCompletesTheBackgroundRitual() async {
+    let retreated = expectation(description: "ink landscape retreated")
+    let coordinator = RitualCoordinator(
+      initialTheme: .landscape,
+      backgroundMode: true,
+      presentation: RitualPresentationClient(
+        fadeOut: {},
+        retreatToBackground: { retreated.fulfill() },
+        terminate: { XCTFail("Background ritual must not terminate") }
+      ),
+      sleep: { _ in }
+    )
+
+    coordinator.activateInkLandscape()
+
+    await fulfillment(of: [retreated], timeout: 1)
+    XCTAssertEqual(coordinator.flow.phase, .sealed)
+  }
 }

@@ -2,6 +2,7 @@ public enum DoorTheme: String, CaseIterable, Identifiable, Sendable {
   case solar
   case formation
   case wood
+  case landscape
   case vault
 
   public var id: Self { self }
@@ -21,6 +22,11 @@ public enum WoodKnockResult: Equatable, Sendable {
 }
 
 public enum SolarActivationResult: Equatable, Sendable {
+  case completed
+  case ignored
+}
+
+public enum InkLandscapeActivationResult: Equatable, Sendable {
   case completed
   case ignored
 }
@@ -72,6 +78,14 @@ public struct LockFlow: Equatable, Sendable {
   @discardableResult
   public mutating func activateSolarSystem() -> SolarActivationResult {
     guard theme == .solar, phase == .sealed else { return .ignored }
+
+    phase = .unlocking
+    return .completed
+  }
+
+  @discardableResult
+  public mutating func activateInkLandscape() -> InkLandscapeActivationResult {
+    guard theme == .landscape, phase == .sealed else { return .ignored }
 
     phase = .unlocking
     return .completed
