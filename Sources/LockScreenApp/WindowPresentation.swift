@@ -102,6 +102,11 @@ enum WindowPresentation {
 
   /// Re-blank secondary displays after a display is (dis)connected mid-session.
   static func refreshScreenCovers() {
+    reassertCoverage()
+    scheduleCoverageReassertion()
+  }
+
+  private static func reassertCoverage() {
     guard let window = mainRitualWindow(),
       isImmersive(window),
       let screen = window.screen
@@ -109,7 +114,6 @@ enum WindowPresentation {
 
     reassertKiosk()
     coverSecondaryScreens(except: screen)
-    scheduleCoverageReassertion()
   }
 
   /// Background mode: after a completed ritual, re-seal and lurk until summoned again.
@@ -190,14 +194,26 @@ enum WindowPresentation {
   private static func scheduleCoverageReassertion() {
     coverageReassertionTask?.cancel()
     coverageReassertionTask = Task { @MainActor in
-      for delay in [150, 350, 700, 2_000] {
-        do {
-          try await Task.sleep(for: .milliseconds(delay))
-        } catch {
-          return
-        }
-        reassertKiosk()
+      await runCoverageReassertions(
+        delays: [150, 350, 700, 2_000].map { .milliseconds($0) },
+        sleep: { try await Task.sleep(for: $0) },
+        refreshCoverage: { reassertCoverage() }
+      )
+    }
+  }
+
+  static func runCoverageReassertions(
+    delays: [Duration],
+    sleep: @MainActor (Duration) async throws -> Void,
+    refreshCoverage: @MainActor () -> Void
+  ) async {
+    for delay in delays {
+      do {
+        try await sleep(delay)
+      } catch {
+        return
       }
+      refreshCoverage()
     }
   }
 

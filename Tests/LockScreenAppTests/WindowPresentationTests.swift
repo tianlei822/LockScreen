@@ -126,6 +126,19 @@ final class WindowPresentationTests: XCTestCase {
   }
 
   @MainActor
+  func testCoverageReassertionsRefreshTheCurrentScreenTopology() async {
+    var refreshCount = 0
+
+    await WindowPresentation.runCoverageReassertions(
+      delays: [.zero, .zero],
+      sleep: { _ in },
+      refreshCoverage: { refreshCount += 1 }
+    )
+
+    XCTAssertEqual(refreshCount, 2)
+  }
+
+  @MainActor
   func testStatusItemUsesAStandardTemplateImageButton() {
     let button = NSStatusBarButton(
       frame: NSRect(x: 0, y: 0, width: 24, height: 24)
