@@ -2,14 +2,16 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+  static let hotKeyRecoveryNotifications: [NSNotification.Name] = [
+    NSWorkspace.sessionDidBecomeActiveNotification,
+    NSWorkspace.didWakeNotification,
+  ]
+
   /// Space transitions can temporarily detach overlay windows, so refresh as
   /// soon as AppKit reports that the active Space changed.
   /// Source: https://developer.apple.com/documentation/appkit/nsworkspace/activespacedidchangenotification
-  static let coverageRefreshNotifications: [NSNotification.Name] = [
-    NSWorkspace.sessionDidBecomeActiveNotification,
-    NSWorkspace.didWakeNotification,
-    NSWorkspace.activeSpaceDidChangeNotification,
-  ]
+  static let coverageRefreshNotifications: [NSNotification.Name] =
+    hotKeyRecoveryNotifications + [NSWorkspace.activeSpaceDidChangeNotification]
 
   static func shouldTerminateAfterLastWindowClosed(
     backgroundMode: Bool,
@@ -72,10 +74,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     let workspaceCenter = NSWorkspace.shared.notificationCenter
     for name in Self.coverageRefreshNotifications {
+      let recoversHotKey = Self.hotKeyRecoveryNotifications.contains(name)
       workspaceObservers.append(
-        workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { _ in
-          Task { @MainActor in
+        workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+          Task { @MainActor [weak self] in
             WindowPresentation.refreshScreenCovers()
+            if recoversHotKey {
+              self?.recoverGlobalHotKeyRegistration()
+            }
           }
         })
     }
@@ -200,6 +206,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     selectedHotKey = preset
     hotKeyPreferenceStore.save(preset)
     return true
+  }
+
+  private func recoverGlobalHotKeyRegistration() {
+    if let hotKey, hotKey.reregister() {
+      return
+    }
+
+    hotKey = nil
+    _ = registerGlobalHotKey(selectedHotKey)
   }
 
 }

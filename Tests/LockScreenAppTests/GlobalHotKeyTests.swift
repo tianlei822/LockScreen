@@ -33,4 +33,35 @@ final class GlobalHotKeyTests: XCTestCase {
     XCTAssertEqual(SendEventToEventTarget(hotKeyEvent, GetApplicationEventTarget()), noErr)
     await fulfillment(of: [actionInvoked], timeout: 1)
   }
+
+  @MainActor
+  func testReregisteredHotKeyDispatchesItsAction() async throws {
+    let actionInvoked = expectation(description: "Re-registered global hot key action invoked")
+    let hotKey = GlobalHotKey(
+      keyCode: UInt32(kVK_F14),
+      modifiers: UInt32(cmdKey | optionKey | shiftKey)
+    ) {
+      actionInvoked.fulfill()
+    }
+    XCTAssertTrue(hotKey.register())
+    XCTAssertTrue(hotKey.reregister())
+    defer { hotKey.unregister() }
+
+    var event: EventRef?
+    XCTAssertEqual(
+      CreateEvent(
+        nil,
+        OSType(kEventClassKeyboard),
+        UInt32(kEventHotKeyPressed),
+        GetCurrentEventTime(),
+        EventAttributes(kEventAttributeUserEvent),
+        &event
+      ),
+      noErr
+    )
+    let hotKeyEvent = try XCTUnwrap(event)
+
+    XCTAssertEqual(SendEventToEventTarget(hotKeyEvent, GetApplicationEventTarget()), noErr)
+    await fulfillment(of: [actionInvoked], timeout: 1)
+  }
 }

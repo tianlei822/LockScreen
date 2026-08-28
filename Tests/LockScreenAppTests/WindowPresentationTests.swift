@@ -126,6 +126,22 @@ final class WindowPresentationTests: XCTestCase {
   }
 
   @MainActor
+  func testGlobalHotKeyRegistrationRecoversAfterWakeAndSessionActivation() {
+    XCTAssertTrue(
+      AppDelegate.hotKeyRecoveryNotifications.contains(
+        NSWorkspace.didWakeNotification
+      ))
+    XCTAssertTrue(
+      AppDelegate.hotKeyRecoveryNotifications.contains(
+        NSWorkspace.sessionDidBecomeActiveNotification
+      ))
+    XCTAssertFalse(
+      AppDelegate.hotKeyRecoveryNotifications.contains(
+        NSWorkspace.activeSpaceDidChangeNotification
+      ))
+  }
+
+  @MainActor
   func testCoverageReassertionsRefreshTheCurrentScreenTopology() async {
     var refreshCount = 0
 

@@ -96,4 +96,10 @@ final class GlobalHotKey {
       self.handlerRef = nil
     }
   }
+
+  @discardableResult
+  func reregister() -> Bool {
+    unregister()
+    return register()
+  }
 }
