@@ -91,10 +91,11 @@ TCC 权限连续性。可通过 `APPLE_SIGNING_IDENTITY` 指定其他证书；�
 ## Controls / 操作
 
 - Choose `Solar Atlas`, `Five-Phase Formation`, `Wooden Door`, `Ink Landscape`, or `Cipher Vault` in the upper-left corner. / 在左上角选择太阳星图、五行阵法、木门、水墨山水或密码箱。
-- Press `R` or use the upper-right reset button to restart the current ritual. / 按 `R` 或点击右上角重置按钮，重新开始当前仪式。
+- Press `R` or use the upper-right reset button to restart the current ritual, including partial codes, traces, and knock feedback. / 按 `R` 或点击右上角重置按钮，重新开始当前仪式，同时清空未完成的密码、描摹与敲击反馈。
 - On `Solar Atlas`, double-click the sun. VoiceOver users can activate the named sun button once. / 在 `Solar Atlas` 中双击太阳；VoiceOver 用户可直接激活已命名的太阳按钮。
 - On `Wooden Door`, knock either brass ring three times. / 在 `Wooden Door` 中敲击任意黄铜门环三次。
 - On `Five-Phase Formation`, choose `Five Phases`, `Bagua Flow`, or `Thunder Seal`, then trace the glowing track. / 在 `Five-Phase Formation` 中选择“五行阵”、“八卦流转”或“雷霆法印”，然后沿发光轨迹描摹。
+- Move the pointer to reveal formation controls, or press `Tab` to keep them visible while navigating with the keyboard. / 移动指针可显示阵法控件；按 `Tab` 进入键盘导航时，控件保持可见。
 - On `Ink Landscape`, click the fishing boat to leave the painting. / 在 `Ink Landscape` 中点击渔舟离开画境。
 - On `Cipher Vault`, enter the configured code with the keyboard or keypad, then press `Return` or the unlock key. Use the gear button to save a persistent 4–8 digit ritual code on this Mac; a valid `--passcode` overrides it for that launch only. The default is `1024`. Never use your macOS password. / 在 `Cipher Vault` 中使用键盘或数字键盘输入配置密码，再按 `Return` 或开锁键。可通过齿轮按钮在本机持久保存 4–8 位仪式密码；有效的 `--passcode` 仅覆盖当次启动。默认值为 `1024`，绝不能使用 macOS 系统密码。
 - After a successful ritual, the doors finish opening, the app hides immediately, and the previous workspace becomes active without an intermediate window. / 仪式成功后，门完成开启，应用立即隐藏并激活之前的工作页面，不再出现中间窗口。

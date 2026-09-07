@@ -43,6 +43,7 @@ struct WoodDoorRingView: View {
                   color: index < knockCount ? Color.orange.opacity(0.8) : .clear,
                   radius: 6
                 )
+                .animation(.easeOut(duration: 0.2), value: knockCount)
             }
           }
         }
@@ -62,7 +63,8 @@ private struct DoorRingButton: View {
   @State private var swing = 0.0
   @State private var rippleProgress = 1.0
   @State private var struck = false
-  @State private var knockID = 0
+  @State private var feedbackTask: Task<Void, Never>?
+  @State private var isHovered = false
   @Environment(\.ritualMotionReduced) private var ritualMotionReduced
 
   private let brass = Color(red: 0.78, green: 0.55, blue: 0.22)
@@ -124,26 +126,41 @@ private struct DoorRingButton: View {
             )
           )
           .overlay(Circle().stroke(Color.black.opacity(0.72), lineWidth: 2))
+          .overlay {
+            Circle()
+              .stroke(brass.opacity(0.7), lineWidth: 1)
+              .padding(6)
+          }
           .overlay(Circle().fill(Color.white.opacity(struck ? 0.22 : 0)))
           .frame(width: 48, height: 48)
       }
       .frame(width: 140, height: 154)
       .contentShape(Rectangle())
+      .brightness(isHovered ? 0.045 : 0)
     }
     .buttonStyle(.plain)
     .accessibilityLabel(L10n.format("Knock %@ door ring", side.localizedName))
     .accessibilityValue(L10n.format("%lld of 3 knocks", knockCount))
     .help(L10n.text("Knock either ring three times"))
+    .onHover { isHovered = $0 }
+    .onDisappear { feedbackTask?.cancel() }
+    .onChange(of: ritualMotionReduced) { _, reduced in
+      if reduced {
+        feedbackTask?.cancel()
+        swing = 0
+        rippleProgress = 1
+        struck = false
+      }
+    }
   }
 
   private func knock() {
+    feedbackTask?.cancel()
     guard !ritualMotionReduced else {
       onKnock()
       return
     }
 
-    knockID += 1
-    let currentKnock = knockID
     var resetTransaction = Transaction()
     resetTransaction.disablesAnimations = true
     withTransaction(resetTransaction) {
@@ -157,9 +174,12 @@ private struct DoorRingButton: View {
       swing = strikeAngle
     }
 
-    Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(100))
-      guard currentKnock == knockID else { return }
+    feedbackTask = Task { @MainActor in
+      do {
+        try await Task.sleep(for: .milliseconds(100))
+      } catch {
+        return
+      }
 
       // Impact: halo, boss flash, then a damped pendulum settle.
       struck = true
@@ -170,8 +190,11 @@ private struct DoorRingButton: View {
         swing = 0
       }
 
-      try? await Task.sleep(for: .milliseconds(180))
-      guard currentKnock == knockID else { return }
+      do {
+        try await Task.sleep(for: .milliseconds(180))
+      } catch {
+        return
+      }
       withAnimation(.easeOut(duration: 0.3)) {
         struck = false
       }

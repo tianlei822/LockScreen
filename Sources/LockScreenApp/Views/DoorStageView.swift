@@ -27,12 +27,15 @@ struct DoorStageView: View {
       let palette = theme.presentationPalette
 
       ZStack {
-        PortalRevealView(theme: theme, palette: palette, isOpen: isOpen)
+        if isOpen {
+          PortalRevealView(theme: theme, palette: palette, isOpen: isOpen)
+            .transition(.opacity)
+        }
 
         if theme == .solar {
           SolarSystemArtwork(isActivated: isOpen, onActivate: onSolarActivate)
         } else if rendersSplitDoors {
-          HStack(spacing: 1) {
+          HStack(spacing: 0) {
             leaf(side: .left, fullSize: size)
               .modifier(
                 DoorLeafMotionModifier(
@@ -95,12 +98,14 @@ struct DoorStageView: View {
           .blendMode(.plusLighter)
           .allowsHitTesting(false)
 
-        ThresholdDetailOverlay(palette: palette, isOpen: isOpen)
+        if theme != .landscape {
+          ThresholdDetailOverlay(theme: theme, palette: palette, isOpen: isOpen)
+        }
       }
       .background(Color.black)
       .clipped()
-      .onChange(of: isOpen) {
-        prepareDoorPresentation(isOpen: isOpen)
+      .task(id: isOpen) {
+        await prepareDoorPresentation(isOpen: isOpen)
       }
     }
     .animation(.easeInOut(duration: ritualMotionReduced ? 0.2 : 1.45), value: isOpen)
@@ -116,7 +121,7 @@ struct DoorStageView: View {
     )
   }
 
-  private func prepareDoorPresentation(isOpen: Bool) {
+  private func prepareDoorPresentation(isOpen: Bool) async {
     guard theme != .solar else {
       splitDoorsOpen = false
       rendersSplitDoors = false
@@ -131,10 +136,9 @@ struct DoorStageView: View {
 
     rendersSplitDoors = true
     splitDoorsOpen = false
-    Task { @MainActor in
-      await Task.yield()
-      splitDoorsOpen = true
-    }
+    await Task.yield()
+    guard !Task.isCancelled else { return }
+    splitDoorsOpen = true
   }
 
   private func leaf(side: DoorSide, fullSize: CGSize) -> some View {

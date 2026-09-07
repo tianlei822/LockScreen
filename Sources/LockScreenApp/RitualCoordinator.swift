@@ -34,6 +34,7 @@ final class RitualCoordinator: ObservableObject {
   typealias Sleep = @MainActor (Duration) async throws -> Void
 
   @Published private(set) var flow: LockFlow
+  @Published private(set) var sessionID = UUID()
 
   private let backgroundMode: Bool
   private let vaultPasscodeStore: VaultPasscodeStore
@@ -59,11 +60,13 @@ final class RitualCoordinator: ObservableObject {
   func selectTheme(_ theme: DoorTheme) {
     cancelUnlockSequence()
     flow.selectTheme(theme)
+    sessionID = UUID()
   }
 
   func reset() {
     cancelUnlockSequence()
     flow.reset()
+    sessionID = UUID()
   }
 
   func activateSolarSystem() {
@@ -120,7 +123,7 @@ final class RitualCoordinator: ObservableObject {
       } catch {
         return
       }
-      guard flow.phase == .unlocking else { return }
+      guard !Task.isCancelled, flow.phase == .unlocking else { return }
       flow.finishUnlockAnimation()
 
       do {
@@ -128,12 +131,14 @@ final class RitualCoordinator: ObservableObject {
       } catch {
         return
       }
-      guard flow.phase == .open else { return }
+      guard !Task.isCancelled, flow.phase == .open else { return }
       flow.finishReveal()
       await presentation.fadeOut()
+      guard !Task.isCancelled, flow.phase == .returningToDesktop else { return }
 
       if backgroundMode {
         flow.reset()
+        sessionID = UUID()
         presentation.retreatToBackground()
       } else {
         presentation.terminate()

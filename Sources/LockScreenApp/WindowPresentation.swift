@@ -140,6 +140,12 @@ enum WindowPresentation {
       context.allowsImplicitAnimation = true
       window.animator().alphaValue = 0
     }
+
+    // AppKit finishes its animation even when the ritual task is cancelled.
+    // A reset must leave the new sealed ritual visible in this same window.
+    if Task.isCancelled {
+      restoreWindowOpacity(window)
+    }
   }
 
   static func restoreWindowOpacity(_ window: NSWindow) {

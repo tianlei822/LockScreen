@@ -7,6 +7,8 @@ struct FormationTraceView: View {
   let showsControls: Bool
   let onSelectTrajectory: (FormationTrajectory) -> Void
   let onTrace: (Double) -> Void
+  @Environment(\.ritualMotionReduced) private var ritualMotionReduced
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
   var body: some View {
     let style = trajectory.visualStyle
@@ -40,8 +42,8 @@ struct FormationTraceView: View {
                     Text(option.symbol)
                       .font(.system(size: 18, weight: .light))
                     Text(option.title)
-                      .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                      .tracking(1.4)
+                      .font(.system(size: 11, weight: .medium))
+                      .tracking(0.6)
                   }
                   .padding(.horizontal, 13)
                   .padding(.vertical, 9)
@@ -55,6 +57,7 @@ struct FormationTraceView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(option == trajectory ? Color.white : Color.white.opacity(0.58))
                 .accessibilityLabel(L10n.format("Use %@ formation", option.title))
+                .accessibilityAddTraits(option == trajectory ? .isSelected : [])
               }
 
               Divider()
@@ -66,13 +69,12 @@ struct FormationTraceView: View {
                 onTrace(1)
               } label: {
                 Label(L10n.text("Channel"), systemImage: "return")
-                  .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                  .tracking(1.2)
+                  .font(.system(size: 11, weight: .medium))
+                  .tracking(0.6)
                   .padding(.horizontal, 12)
                   .padding(.vertical, 9)
               }
-              .buttonStyle(.plain)
-              .foregroundStyle(style.primary.opacity(0.72))
+              .buttonStyle(RitualButtonStyle(palette: .formation))
               .keyboardShortcut(.return, modifiers: [])
               .accessibilityLabel(
                 L10n.text("Channel the selected formation without dragging")
@@ -80,10 +82,22 @@ struct FormationTraceView: View {
               .help(L10n.text("Keyboard alternative: press Return"))
             }
           }
+          .padding(14)
+          .background(
+            ThemePalette.formation.backdrop.opacity(reduceTransparency ? 1 : 0.86),
+            in: RoundedRectangle(cornerRadius: 10)
+          )
+          .overlay {
+            RoundedRectangle(cornerRadius: 10)
+              .strokeBorder(style.primary.opacity(0.18), lineWidth: 1)
+          }
           .opacity(showsControls ? 1 : 0)
-          .offset(y: showsControls ? 0 : 10)
+          .offset(y: showsControls || ritualMotionReduced ? 0 : 10)
           .allowsHitTesting(showsControls)
-          .animation(.easeInOut(duration: 0.58), value: showsControls)
+          .accessibilityHidden(!showsControls)
+          .animation(
+            .easeInOut(duration: ritualMotionReduced ? 0.15 : 0.4), value: showsControls
+          )
         }
         .padding(.bottom, 4)
       }
@@ -99,9 +113,9 @@ struct FormationTraceView: View {
         Spacer()
         Text(energy >= 1 ? L10n.text("ACTIVATED") : "\(Int(energy * 100))%")
       }
-      .font(.system(size: 9, weight: .semibold, design: .monospaced))
-      .tracking(1.8)
-      .foregroundStyle(style.primary.opacity(0.78))
+      .font(.system(size: 10, weight: .medium, design: .monospaced))
+      .tracking(1.2)
+      .foregroundStyle(style.primary)
 
       GeometryReader { proxy in
         ZStack(alignment: .leading) {

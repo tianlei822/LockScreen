@@ -4,53 +4,60 @@ import SwiftUI
 /// A restrained foreground engraving shared by every door theme.
 /// It gives the screen edges physical depth without competing with the central ritual.
 struct ThresholdDetailOverlay: View {
+  let theme: DoorTheme
   let palette: ThemePalette
   let isOpen: Bool
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
   @Environment(\.ritualMotionReduced) private var ritualMotionReduced
 
   var body: some View {
-    TimelineView(
-      .animation(
-        minimumInterval: 1 / 20,
-        paused: RitualMotionPolicy.pausesVisualEffects(
-          renderingPaused: ritualAnimationsPaused,
-          reduceMotion: ritualMotionReduced
+    GeometryReader { proxy in
+      let size = proxy.size
+
+      ZStack {
+        perimeterEtching(size: size, palette: palette)
+
+        RadialGradient(
+          colors: [
+            palette.accent.opacity(isOpen ? 0.12 : 0.035),
+            .clear,
+          ],
+          center: .center,
+          startRadius: 0,
+          endRadius: min(size.width, size.height) * 0.32
         )
-      )
-    ) { timeline in
-      GeometryReader { proxy in
-        let size = proxy.size
-        let time = timeline.date.timeIntervalSinceReferenceDate
+        .blendMode(.plusLighter)
 
-        ZStack {
-          perimeterEtching(size: size, time: time, palette: palette)
-
-          RadialGradient(
-            colors: [
-              palette.accent.opacity(isOpen ? 0.12 : 0.035),
-              .clear,
-            ],
-            center: .center,
-            startRadius: 0,
-            endRadius: min(size.width, size.height) * 0.32
-          )
-          .blendMode(.plusLighter)
-
-          floatingDust(size: size, time: time, palette: palette)
+        if theme != .vault {
+          TimelineView(
+            .animation(
+              minimumInterval: 1 / 20,
+              paused: RitualMotionPolicy.pausesVisualEffects(
+                renderingPaused: ritualAnimationsPaused,
+                reduceMotion: ritualMotionReduced
+              )
+            )
+          ) { timeline in
+            floatingDust(
+              size: size,
+              time: timeline.date.timeIntervalSinceReferenceDate,
+              palette: palette
+            )
+          }
         }
-        .allowsHitTesting(false)
       }
     }
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
   }
 
   private func perimeterEtching(
-    size: CGSize, time: TimeInterval, palette: ThemePalette
+    size: CGSize, palette: ThemePalette
   ) -> some View {
     Canvas { context, _ in
       let outerInset: CGFloat = 8
       let innerInset: CGFloat = 20
-      let pulse = 0.5 + 0.5 * sin(time * 0.8)
+      guard size.width > innerInset * 2, size.height > innerInset * 2 else { return }
 
       context.stroke(
         Path(
@@ -60,7 +67,7 @@ struct ThresholdDetailOverlay: View {
             width: size.width - outerInset * 2,
             height: size.height - outerInset * 2
           )),
-        with: .color(palette.detail.opacity(0.12 + pulse * 0.04)),
+        with: .color(palette.detail.opacity(0.14)),
         lineWidth: 1
       )
 
@@ -93,10 +100,12 @@ struct ThresholdDetailOverlay: View {
         bracket.addLine(to: CGPoint(x: origin.x, y: origin.y + vertical))
         context.stroke(
           bracket,
-          with: .color(palette.detail.opacity(0.3 + pulse * 0.12)),
+          with: .color(palette.detail.opacity(0.36)),
           style: StrokeStyle(lineWidth: 1.2, lineCap: .square)
         )
       }
+
+      guard theme != .wood else { return }
 
       for index in 0..<18 {
         let fraction = CGFloat(index + 1) / 19
@@ -139,6 +148,7 @@ struct ThresholdDetailOverlay: View {
     size: CGSize, time: TimeInterval, palette: ThemePalette
   ) -> some View {
     Canvas { context, _ in
+      guard size.width > 0, size.height > 0 else { return }
       for index in 0..<22 {
         let seed = Double(index + 1)
         let xSeed = abs(sin(seed * 17.17) * 913.7).truncatingRemainder(dividingBy: 1)

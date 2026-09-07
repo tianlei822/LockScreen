@@ -168,6 +168,27 @@ final class WindowPresentationTests: XCTestCase {
   }
 
   @MainActor
+  func testCancelledFadeRestoresWindowOpacity() async {
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+      styleMask: [.borderless],
+      backing: .buffered,
+      defer: false
+    )
+    let started = expectation(description: "window fade started")
+    let fade = Task { @MainActor in
+      started.fulfill()
+      await WindowPresentation.fadeOut(window)
+    }
+
+    await fulfillment(of: [started], timeout: 1)
+    fade.cancel()
+    await fade.value
+
+    XCTAssertEqual(window.alphaValue, 1)
+  }
+
+  @MainActor
   func testRestoringWindowOpacityPreparesItForTheNextPresentation() {
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),

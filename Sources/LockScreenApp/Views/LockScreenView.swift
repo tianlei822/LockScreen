@@ -5,9 +5,11 @@ import SwiftUI
 struct LockScreenView: View {
   @StateObject private var coordinator: RitualCoordinator
   @State private var controlsVisible = true
+  @State private var usesKeyboardNavigation = false
   @State private var controlsVisibilityTask: Task<Void, Never>?
   @State private var isThemeSelectorHovered = false
   @State private var isImmersive = false
+  @FocusState private var ritualIsFocused: Bool
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -43,11 +45,17 @@ struct LockScreenView: View {
           onSolarActivate: activateSolarSystem,
           onLandscapeActivate: activateInkLandscape
         )
+        .id(coordinator.sessionID)
         .frame(width: proxy.size.width, height: proxy.size.height)
         .ignoresSafeArea()
 
         LinearGradient(
-          colors: [.black.opacity(0.38), .clear, .black.opacity(0.46)],
+          stops: [
+            .init(color: .black.opacity(flow.theme == .landscape ? 0.16 : 0.3), location: 0),
+            .init(color: .clear, location: 0.3),
+            .init(color: .clear, location: 0.7),
+            .init(color: .black.opacity(flow.theme == .landscape ? 0.12 : 0.32), location: 1),
+          ],
           startPoint: .top,
           endPoint: .bottom
         )
@@ -61,6 +69,7 @@ struct LockScreenView: View {
             onSelectTrajectory: selectFormationTrajectory,
             onTrace: traceFormation
           )
+          .id(coordinator.sessionID)
           .padding(.horizontal, max(24, proxy.size.width * 0.045))
           .padding(.top, 24)
           .padding(.bottom, 28)
@@ -79,6 +88,7 @@ struct LockScreenView: View {
             EmptyView()
           case .wood:
             WoodDoorRingView(knockCount: flow.woodKnockCount, onKnock: knockWoodDoor)
+              .id(coordinator.sessionID)
               .ignoresSafeArea()
           case .formation:
             EmptyView()
@@ -89,6 +99,7 @@ struct LockScreenView: View {
               onSubmit: submitVaultPasscode,
               onUpdatePasscode: updateVaultPasscode
             )
+            .id(coordinator.sessionID)
           }
         }
         .padding(.horizontal, max(24, proxy.size.width * 0.045))
@@ -98,16 +109,22 @@ struct LockScreenView: View {
         .allowsHitTesting(flow.phase == .sealed)
         .animation(.easeOut(duration: 0.35), value: flow.phase)
       }
+      .focusable(flow.theme != .vault)
+      .focusEffectDisabled()
+      .focused($ritualIsFocused)
       .onContinuousHover { phase in
         if case .active = phase {
+          usesKeyboardNavigation = false
           revealControls()
         }
       }
       .onKeyPress(.tab) {
+        usesKeyboardNavigation = true
         revealControls()
         return .ignored
       }
     }
+    .defaultFocus($ritualIsFocused, flow.theme != .vault)
     .environment(\.ritualMotionReduced, reduceMotion)
     .preferredColorScheme(.dark)
     .onAppear {
@@ -121,8 +138,17 @@ struct LockScreenView: View {
       controlsVisibilityTask?.cancel()
       coordinator.cancel()
     }
-    .onChange(of: flow.theme) {
+    .onChange(of: coordinator.sessionID) {
+      ritualIsFocused = flow.theme != .vault
       revealControls()
+    }
+    .onChange(of: ritualAnimationsPaused) { _, paused in
+      if paused {
+        controlsVisibilityTask?.cancel()
+        coordinator.reset()
+      } else {
+        revealControls()
+      }
     }
     .onChange(of: flow.phase) { _, phase in
       if phase != .sealed {
@@ -132,7 +158,7 @@ struct LockScreenView: View {
   }
 
   private func header(palette: ThemePalette, availableWidth: CGFloat) -> some View {
-    let responsiveClockSize = min(64, max(44, availableWidth * 0.055))
+    let responsiveClockSize = min(76, max(52, availableWidth * 0.062))
     let clockSize = flow.theme == .vault ? min(54, responsiveClockSize) : responsiveClockSize
 
     return ZStack(alignment: .top) {
@@ -141,14 +167,30 @@ struct LockScreenView: View {
       ) { timeline in
         VStack(spacing: 5) {
           Text(timeline.date, format: .dateTime.hour().minute())
-            .font(.system(size: clockSize, weight: .bold, design: .rounded))
+            .font(.system(size: clockSize, weight: .light, design: clockDesign))
             .monospacedDigit()
+            .tracking(-1.5)
           Text(timeline.date, format: .dateTime.weekday(.wide).month(.wide).day())
-            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-            .tracking(1.8)
-            .foregroundStyle(palette.secondaryText)
+            .font(.system(size: 12, weight: .medium))
+            .tracking(1.2)
+            .foregroundStyle(
+              flow.theme == .landscape ? palette.backdrop.opacity(0.85) : palette.secondaryText
+            )
         }
-        .foregroundStyle(palette.primaryText)
+        .foregroundStyle(flow.theme == .landscape ? palette.backdrop : palette.primaryText)
+        .shadow(
+          color: flow.theme == .landscape ? .clear : palette.backdrop.opacity(0.65),
+          radius: 12, y: 2
+        )
+        .background {
+          if flow.theme == .landscape {
+            Ellipse()
+              .fill(palette.primaryText.opacity(0.88))
+              .frame(width: 300, height: 144)
+              .blur(radius: 28)
+              .allowsHitTesting(false)
+          }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(timeline.date.formatted(date: .complete, time: .shortened))
       }
@@ -179,7 +221,7 @@ struct LockScreenView: View {
               : L10n.text("Enter immersive mode (⇧⌘F)"),
             palette: palette
           ) {
-            WindowPresentation.toggle(NSApp.keyWindow ?? NSApp.windows.first)
+            WindowPresentation.toggle(WindowPresentation.mainRitualWindow())
             refreshImmersiveState()
           }
           .keyboardShortcut("f", modifiers: [.command, .shift])
@@ -187,6 +229,14 @@ struct LockScreenView: View {
       }
     }
     .frame(maxWidth: .infinity)
+  }
+
+  private var clockDesign: Font.Design {
+    switch flow.theme {
+    case .wood, .landscape: .serif
+    case .vault: .monospaced
+    case .solar, .formation: .default
+    }
   }
 
   private func themeSelector(palette: ThemePalette) -> some View {
@@ -211,12 +261,12 @@ struct LockScreenView: View {
 
         VStack(alignment: .leading, spacing: 2) {
           Text(flow.theme.title)
-            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-            .tracking(1.3)
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(0.6)
             .foregroundStyle(palette.primaryText.opacity(0.92))
             .lineLimit(1)
           Text(flow.theme.subtitle)
-            .font(.system(size: 9, weight: .medium, design: .monospaced))
+            .font(.system(size: 10, weight: .regular))
             .tracking(0.5)
             .foregroundStyle(palette.secondaryText)
             .lineLimit(1)
@@ -243,9 +293,12 @@ struct LockScreenView: View {
           )
       }
     }
-    .menuStyle(.borderlessButton)
+    .menuStyle(.button)
+    .buttonStyle(.plain)
     .menuIndicator(.hidden)
     .fixedSize()
+    .accessibilityElement(children: .ignore)
+    .accessibilityAddTraits(.isButton)
     .accessibilityLabel(
       L10n.format("Choose door theme; current theme is %@", flow.theme.title)
     )
@@ -292,7 +345,7 @@ struct LockScreenView: View {
   }
 
   private func revealControls() {
-    guard flow.phase == .sealed else { return }
+    guard flow.phase == .sealed, !ritualAnimationsPaused else { return }
 
     controlsVisibilityTask?.cancel()
     if !controlsVisible {
@@ -300,6 +353,7 @@ struct LockScreenView: View {
         controlsVisible = true
       }
     }
+    guard !usesKeyboardNavigation else { return }
 
     controlsVisibilityTask = Task { @MainActor in
       do {
@@ -327,29 +381,15 @@ private struct HeaderIconButton: View {
   let palette: ThemePalette
   let action: () -> Void
 
-  @State private var isHovered = false
-  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
   var body: some View {
     Button(action: action) {
       Label(label, systemImage: systemImage)
         .labelStyle(.iconOnly)
         .font(.system(size: 13, weight: .semibold))
-        .frame(width: 36, height: 36)
-        .background(
-          palette.backdrop.opacity(reduceTransparency ? 0.96 : (isHovered ? 0.42 : 0.26)),
-          in: RoundedRectangle(cornerRadius: 8)
-        )
-        .overlay {
-          RoundedRectangle(cornerRadius: 8)
-            .stroke(palette.detail.opacity(isHovered ? 0.42 : 0.24), lineWidth: 0.8)
-        }
+        .frame(width: 40, height: 44)
     }
-    .buttonStyle(.plain)
-    .foregroundStyle(isHovered ? palette.primaryText : palette.secondaryText)
+    .buttonStyle(RitualButtonStyle(palette: palette))
     .accessibilityLabel(label)
     .help(help)
-    .onHover { isHovered = $0 }
-    .animation(.easeOut(duration: 0.18), value: isHovered)
   }
 }

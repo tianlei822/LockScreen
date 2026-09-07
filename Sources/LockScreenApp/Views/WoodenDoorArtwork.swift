@@ -9,6 +9,7 @@ struct WoodenDoorArtwork: View {
   private let brass = Color(red: 0.8, green: 0.57, blue: 0.25)
 
   @State private var rippleProgress = 1.0
+  @Environment(\.ritualMotionReduced) private var ritualMotionReduced
 
   var body: some View {
     GeometryReader { proxy in
@@ -73,13 +74,18 @@ struct WoodenDoorArtwork: View {
           .stroke(edgeWood, lineWidth: 10)
           .padding(5)
       }
-      .onChange(of: knockCount) { _, count in
-        guard count > 0 else { return }
-        rippleProgress = 0
-        DispatchQueue.main.async {
-          withAnimation(.easeOut(duration: 0.68)) {
-            rippleProgress = 1
-          }
+      .task(id: knockCount) {
+        guard knockCount > 0, !ritualMotionReduced else {
+          rippleProgress = 1
+          return
+        }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { rippleProgress = 0 }
+        await Task.yield()
+        guard !Task.isCancelled else { return }
+        withAnimation(.easeOut(duration: 0.68)) {
+          rippleProgress = 1
         }
       }
     }
