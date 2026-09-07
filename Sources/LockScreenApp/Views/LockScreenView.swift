@@ -8,8 +8,10 @@ struct LockScreenView: View {
   @State private var usesKeyboardNavigation = false
   @State private var controlsVisibilityTask: Task<Void, Never>?
   @State private var isThemeSelectorHovered = false
+  @State private var isThemePickerPresented = false
   @State private var isImmersive = false
   @FocusState private var ritualIsFocused: Bool
+  @FocusState private var focusedPickerTheme: DoorTheme?
   @Environment(\.ritualAnimationsPaused) private var ritualAnimationsPaused
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -108,6 +110,17 @@ struct LockScreenView: View {
         .opacity(flow.phase == .sealed ? 1 : 0)
         .allowsHitTesting(flow.phase == .sealed)
         .animation(.easeOut(duration: 0.35), value: flow.phase)
+
+        if isThemePickerPresented {
+          Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture { isThemePickerPresented = false }
+
+          themePicker(palette: palette)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.horizontal, max(24, proxy.size.width * 0.045))
+            .padding(.top, (isImmersive ? 24 : (flow.theme == .vault ? 32 : 48)) + 52)
+        }
       }
       .focusable(flow.theme != .vault)
       .focusEffectDisabled()
@@ -117,6 +130,11 @@ struct LockScreenView: View {
           usesKeyboardNavigation = false
           revealControls()
         }
+      }
+      .onKeyPress(.escape) {
+        guard isThemePickerPresented else { return .ignored }
+        isThemePickerPresented = false
+        return .handled
       }
       .onKeyPress(.tab) {
         usesKeyboardNavigation = true
@@ -144,6 +162,7 @@ struct LockScreenView: View {
     }
     .onChange(of: ritualAnimationsPaused) { _, paused in
       if paused {
+        isThemePickerPresented = false
         controlsVisibilityTask?.cancel()
         coordinator.reset()
       } else {
@@ -152,6 +171,7 @@ struct LockScreenView: View {
     }
     .onChange(of: flow.phase) { _, phase in
       if phase != .sealed {
+        isThemePickerPresented = false
         controlsVisibilityTask?.cancel()
       }
     }
@@ -240,18 +260,8 @@ struct LockScreenView: View {
   }
 
   private func themeSelector(palette: ThemePalette) -> some View {
-    Menu {
-      ForEach(DoorTheme.allCases) { theme in
-        Button {
-          coordinator.selectTheme(theme)
-        } label: {
-          Label(
-            theme.title,
-            systemImage: theme == flow.theme ? "checkmark" : theme.symbolName
-          )
-        }
-        .accessibilityLabel(L10n.format("Use %@ theme", theme.title))
-      }
+    Button {
+      isThemePickerPresented.toggle()
     } label: {
       HStack(spacing: 10) {
         Image(systemName: flow.theme.symbolName)
@@ -293,9 +303,7 @@ struct LockScreenView: View {
           )
       }
     }
-    .menuStyle(.button)
     .buttonStyle(.plain)
-    .menuIndicator(.hidden)
     .fixedSize()
     .accessibilityElement(children: .ignore)
     .accessibilityAddTraits(.isButton)
@@ -305,6 +313,64 @@ struct LockScreenView: View {
     .help(L10n.text("Choose door theme"))
     .onHover { isThemeSelectorHovered = $0 }
     .animation(.easeOut(duration: 0.18), value: isThemeSelectorHovered)
+    .onChange(of: isThemePickerPresented) { _, presented in
+      if !presented {
+        focusedPickerTheme = nil
+        ritualIsFocused = flow.theme != .vault
+      }
+      revealControls()
+    }
+  }
+
+  // Native Menu tracking suspends TimelineView updates. Keep the picker in the
+  // ritual window so animation and keyboard focus stay on the same event loop.
+  private func themePicker(palette: ThemePalette) -> some View {
+    VStack(spacing: 4) {
+      ForEach(DoorTheme.allCases) { theme in
+        Button {
+          isThemePickerPresented = false
+          coordinator.selectTheme(theme)
+        } label: {
+          HStack(spacing: 10) {
+            Image(systemName: theme.symbolName)
+              .frame(width: 22)
+            Text(theme.title)
+            Spacer()
+            Image(systemName: "checkmark")
+              .opacity(theme == flow.theme ? 1 : 0)
+          }
+          .font(.system(size: 12, weight: .medium))
+          .padding(.horizontal, 12)
+          .frame(height: 38)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(RitualButtonStyle(palette: palette))
+        .focusable()
+        .focused($focusedPickerTheme, equals: theme)
+        .accessibilityLabel(L10n.format("Use %@ theme", theme.title))
+        .accessibilityAddTraits(theme == flow.theme ? .isSelected : [])
+      }
+    }
+    .padding(8)
+    .frame(width: 260)
+    .background(palette.backdrop, in: RoundedRectangle(cornerRadius: 10))
+    .overlay {
+      RoundedRectangle(cornerRadius: 10)
+        .strokeBorder(palette.detail.opacity(0.3), lineWidth: 1)
+    }
+    .task {
+      await Task.yield()
+      guard !Task.isCancelled else { return }
+      focusedPickerTheme = flow.theme
+    }
+    .onMoveCommand { direction in
+      guard direction == .up || direction == .down,
+        let index = DoorTheme.allCases.firstIndex(of: focusedPickerTheme ?? flow.theme)
+      else { return }
+      let count = DoorTheme.allCases.count
+      let nextIndex = (index + (direction == .down ? 1 : count - 1)) % count
+      focusedPickerTheme = DoorTheme.allCases[nextIndex]
+    }
   }
 
   private func knockWoodDoor() {
@@ -353,7 +419,7 @@ struct LockScreenView: View {
         controlsVisible = true
       }
     }
-    guard !usesKeyboardNavigation else { return }
+    guard !usesKeyboardNavigation, !isThemePickerPresented else { return }
 
     controlsVisibilityTask = Task { @MainActor in
       do {
