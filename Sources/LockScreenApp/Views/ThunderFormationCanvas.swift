@@ -201,12 +201,12 @@ struct ThunderFormationCanvas: View {
           seed: sector
         )
         var lightningGlow = context
-        lightningGlow.addFilter(.blur(radius: 7 + energy * 7))
+        lightningGlow.addFilter(.blur(radius: 4 + energy * 4))
         lightningGlow.stroke(
           lightning,
           with: .color(style.primary.opacity((0.38 + energy * 0.3) * connectorFlash)),
           style: StrokeStyle(
-            lineWidth: 10 * (sector.isMultiple(of: 2) ? outwardBeat : inwardBeat)
+            lineWidth: 6 * (sector.isMultiple(of: 2) ? outwardBeat : inwardBeat)
               * (0.64 + CGFloat(connectorFlash) * 0.58),
             lineCap: .round,
             lineJoin: .miter
@@ -224,7 +224,7 @@ struct ThunderFormationCanvas: View {
             endPoint: polarPoint(center: center, radius: unit * 0.1, angle: angle)
           ),
           style: StrokeStyle(
-            lineWidth: (sector.isMultiple(of: 2) ? 3.6 : 2.3)
+            lineWidth: (sector.isMultiple(of: 2) ? 1.65 : 1.15)
               * (sector.isMultiple(of: 2) ? outwardBeat : inwardBeat)
               * (0.68 + CGFloat(connectorFlash) * 0.52),
             lineCap: .round,
@@ -235,7 +235,7 @@ struct ThunderFormationCanvas: View {
           lightning,
           with: .color(Color.white.opacity((0.42 + energy * 0.22) * connectorFlash)),
           style: StrokeStyle(
-            lineWidth: 0.8 * (sector.isMultiple(of: 2) ? outwardBeat : inwardBeat)
+            lineWidth: 0.55 * (sector.isMultiple(of: 2) ? outwardBeat : inwardBeat)
               * (0.62 + CGFloat(connectorFlash) * 0.72),
             lineCap: .round,
             lineJoin: .miter
@@ -277,7 +277,7 @@ struct ThunderFormationCanvas: View {
             branch,
             with: .color(Color.white.opacity((0.62 + energy * 0.2) * branchFlash)),
             style: StrokeStyle(
-              lineWidth: (1.9 - CGFloat(branchIndex) * 0.3) * (0.78 + rhythm * 0.38),
+              lineWidth: (0.85 - CGFloat(branchIndex) * 0.18) * (0.78 + rhythm * 0.38),
               lineCap: .round,
               lineJoin: .miter
             )
@@ -421,22 +421,30 @@ struct ThunderFormationCanvas: View {
     angle: Double,
     seed: Int
   ) -> Path {
-    let tangent = CGPoint(x: -sin(angle), y: cos(angle))
-    let radii: [CGFloat] = [0.39, 0.335, 0.3, 0.245, 0.205, 0.145, 0.095]
+    let points = inwardLightningPoints(center: center, unit: unit, angle: angle, seed: seed)
     return Path { path in
-      for (index, radius) in radii.enumerated() {
-        let wobble =
-          index == 0 || index == radii.count - 1
-          ? 0
-          : CGFloat((index + seed).isMultiple(of: 2) ? 1 : -1)
-            * unit * (0.014 + CGFloat((index + seed) % 3) * 0.005)
-        let point = polarPoint(center: center, radius: unit * radius, angle: angle)
-        let displaced = CGPoint(
-          x: point.x + tangent.x * wobble,
-          y: point.y + tangent.y * wobble
-        )
-        index == 0 ? path.move(to: displaced) : path.addLine(to: displaced)
+      for (index, point) in points.enumerated() {
+        index == 0 ? path.move(to: point) : path.addLine(to: point)
       }
+    }
+  }
+
+  private func inwardLightningPoints(
+    center: CGPoint,
+    unit: CGFloat,
+    angle: Double,
+    seed: Int
+  ) -> [CGPoint] {
+    let tangent = CGPoint(x: -sin(angle), y: cos(angle))
+    return (0...24).map { index in
+      let fraction = CGFloat(index) / 24
+      let phase = Double(index) * 1.91 + Double(seed) * 5.73
+      let envelope = sin(fraction * .pi)
+      let wobble =
+        unit * envelope
+        * CGFloat(sin(phase * 0.43) * 0.018 + sin(phase * 2.17) * 0.006)
+      let point = polarPoint(center: center, radius: unit * (0.39 - fraction * 0.295), angle: angle)
+      return CGPoint(x: point.x + tangent.x * wobble, y: point.y + tangent.y * wobble)
     }
   }
 
@@ -500,11 +508,11 @@ struct ThunderFormationCanvas: View {
   ) -> [Path] {
     let radial = CGPoint(x: cos(angle), y: sin(angle))
     let tangent = CGPoint(x: -sin(angle), y: cos(angle))
-    let startRadii: [CGFloat] = [0.315, 0.248, 0.19]
+    let trunk = inwardLightningPoints(center: center, unit: unit, angle: angle, seed: seed)
 
-    return startRadii.enumerated().map { branchIndex, radius in
+    return (0..<3).map { branchIndex in
       let direction: CGFloat = (branchIndex + seed).isMultiple(of: 2) ? 1 : -1
-      let start = polarPoint(center: center, radius: unit * radius, angle: angle)
+      let start = trunk[6 + branchIndex * 6]
       return Path { path in
         path.move(to: start)
         for step in 1...4 {

@@ -24,9 +24,9 @@ struct SolarFireDragonFormation: View {
         Path(ellipseIn: auraRect),
         with: .radialGradient(
           Gradient(colors: [
-            Color.white.opacity(0.72),
-            Color.yellow.opacity(0.82),
-            Color.orange.opacity(0.5),
+            Color.white.opacity(0.32),
+            Color.yellow.opacity(0.54),
+            Color.orange.opacity(0.36),
             Color.red.opacity(0.12),
             .clear,
           ]),
@@ -156,14 +156,14 @@ struct SolarFireDragonFormation: View {
 
       let dragon = dragonBodyPath(center: center, unit: unit)
       var dragonAura = context
-      dragonAura.addFilter(.blur(radius: 9 + energy * 6))
+      dragonAura.addFilter(.blur(radius: 6 + energy * 4))
       dragonAura.stroke(
         dragon,
         with: .color(Color(red: 0.74, green: 0.02, blue: 0.006).opacity(0.58)),
-        style: StrokeStyle(lineWidth: unit * 0.072, lineCap: .round, lineJoin: .round)
+        style: StrokeStyle(lineWidth: unit * 0.05, lineCap: .round, lineJoin: .round)
       )
-      context.stroke(
-        dragon,
+      context.fill(
+        dragonBodySilhouette(center: center, unit: unit),
         with: .linearGradient(
           Gradient(colors: [
             Color(red: 0.58, green: 0.015, blue: 0.004),
@@ -172,8 +172,7 @@ struct SolarFireDragonFormation: View {
           ]),
           startPoint: CGPoint(x: center.x - unit * 0.35, y: center.y + unit * 0.32),
           endPoint: CGPoint(x: center.x + unit * 0.35, y: center.y - unit * 0.3)
-        ),
-        style: StrokeStyle(lineWidth: unit * 0.052, lineCap: .round, lineJoin: .round)
+        )
       )
       context.stroke(
         dragon,
@@ -181,8 +180,9 @@ struct SolarFireDragonFormation: View {
         style: StrokeStyle(lineWidth: 0.9 + energy * 0.6, lineCap: .round)
       )
 
-      for index in 2..<19 {
-        let fraction = Double(index) / 20
+      for index in 3..<80 {
+        let fraction = Double(index) / 82
+        let bodyRadius = unit * (0.004 + sqrt(fraction) * 0.022)
         let bodyPoint = dragonPoint(center: center, unit: unit, fraction: fraction)
         let normalAngle = dragonTangentAngle(fraction: fraction) + Double.pi / 2
         let normal = CGPoint(x: cos(normalAngle), y: sin(normalAngle))
@@ -190,12 +190,12 @@ struct SolarFireDragonFormation: View {
         let direction: CGFloat = radial.x * normal.x + radial.y * normal.y >= 0 ? 1 : -1
         let outward = CGPoint(x: normal.x * direction, y: normal.y * direction)
         let inner = CGPoint(
-          x: bodyPoint.x - outward.x * unit * 0.021,
-          y: bodyPoint.y - outward.y * unit * 0.021
+          x: bodyPoint.x - outward.x * bodyRadius * 0.85,
+          y: bodyPoint.y - outward.y * bodyRadius * 0.85
         )
         let outer = CGPoint(
-          x: bodyPoint.x + outward.x * unit * 0.021,
-          y: bodyPoint.y + outward.y * unit * 0.021
+          x: bodyPoint.x + outward.x * bodyRadius * 0.85,
+          y: bodyPoint.y + outward.y * bodyRadius * 0.85
         )
         var scaleBand = Path()
         scaleBand.move(to: inner)
@@ -206,33 +206,40 @@ struct SolarFireDragonFormation: View {
         context.stroke(
           scaleBand,
           with: .color(Color(red: 0.42, green: 0.01, blue: 0.004).opacity(0.72)),
-          style: StrokeStyle(lineWidth: 0.75, lineCap: .round)
+          style: StrokeStyle(lineWidth: 0.45, lineCap: .round)
         )
 
-        let bodyScale = dragonScalePath(
-          center: bodyPoint,
-          scale: unit * (index.isMultiple(of: 3) ? 0.032 : 0.025),
-          angle: dragonTangentAngle(fraction: fraction)
-        )
-        context.fill(
-          bodyScale,
-          with: .linearGradient(
-            Gradient(colors: [
-              Color.yellow.opacity(0.72),
-              Color.orange.opacity(0.52),
-              Color(red: 0.34, green: 0.006, blue: 0.002).opacity(0.82),
-            ]),
-            startPoint: inner,
-            endPoint: outer
+        for row in -1...1 {
+          let stagger = row == 0 ? 0 : 0.5 / 82
+          let rowPoint = dragonPoint(center: center, unit: unit, fraction: fraction + stagger)
+          let bodyScale = dragonScalePath(
+            center: CGPoint(
+              x: rowPoint.x + normal.x * CGFloat(row) * bodyRadius * 0.56,
+              y: rowPoint.y + normal.y * CGFloat(row) * bodyRadius * 0.56
+            ),
+            scale: bodyRadius * 0.75,
+            angle: dragonTangentAngle(fraction: fraction)
           )
-        )
-        context.stroke(
-          bodyScale,
-          with: .color(Color(red: 0.26, green: 0.004, blue: 0.002).opacity(0.78)),
-          lineWidth: 0.55
-        )
+          context.fill(
+            bodyScale,
+            with: .linearGradient(
+              Gradient(colors: [
+                Color.yellow.opacity(0.56),
+                Color.orange.opacity(0.72),
+                Color(red: 0.34, green: 0.006, blue: 0.002).opacity(0.82),
+              ]),
+              startPoint: inner,
+              endPoint: outer
+            )
+          )
+          context.stroke(
+            bodyScale,
+            with: .color(Color(red: 0.26, green: 0.004, blue: 0.002).opacity(0.78)),
+            lineWidth: 0.4
+          )
+        }
 
-        if index.isMultiple(of: 2) {
+        if index.isMultiple(of: 5) {
           var spine = Path()
           spine.move(to: outer)
           spine.addLine(
@@ -291,7 +298,7 @@ struct SolarFireDragonFormation: View {
       let mane = dragonManePath(center: headCenter, scale: headScale, angle: headAngle)
       var maneGlow = context
       maneGlow.addFilter(.blur(radius: 7 + energy * 4))
-      maneGlow.fill(mane, with: .color(Color.orange.opacity(0.58)))
+      maneGlow.fill(mane, with: .color(Color.orange.opacity(0.26)))
       context.fill(
         mane,
         with: .linearGradient(
@@ -328,8 +335,8 @@ struct SolarFireDragonFormation: View {
         angle: headAngle
       )
       var headGlow = context
-      headGlow.addFilter(.blur(radius: 8 + energy * 5))
-      headGlow.fill(head, with: .color(Color.orange.opacity(0.72)))
+      headGlow.addFilter(.blur(radius: 4 + energy * 3))
+      headGlow.fill(head, with: .color(Color.orange.opacity(0.24)))
       context.fill(
         head,
         with: .linearGradient(
@@ -418,6 +425,10 @@ struct SolarFireDragonFormation: View {
         Path(ellipseIn: eyeRect.insetBy(dx: 1, dy: 1)),
         with: .color(Color(red: 0.88, green: 1, blue: 0.78).opacity(0.98))
       )
+      context.fill(
+        Path(ellipseIn: CGRect(x: eye.x - 0.6, y: eye.y - 1.7, width: 1.2, height: 3.4)),
+        with: .color(Color(red: 0.04, green: 0.015, blue: 0.005))
+      )
 
       for index in 0..<18 {
         let seed = Double(index + 1)
@@ -455,6 +466,25 @@ struct SolarFireDragonFormation: View {
         index == 0 ? path.move(to: point) : path.addLine(to: point)
       }
     }
+  }
+
+  private func dragonBodySilhouette(center: CGPoint, unit: CGFloat) -> Path {
+    var path = Path()
+    for side in [1.0, -1.0] {
+      for step in 0...120 {
+        let fraction = side > 0 ? Double(step) / 120 : 1 - Double(step) / 120
+        let point = dragonPoint(center: center, unit: unit, fraction: fraction)
+        let angle = dragonTangentAngle(fraction: fraction) + .pi / 2
+        let radius = unit * (0.004 + sqrt(fraction) * 0.022)
+        let edge = CGPoint(
+          x: point.x + cos(angle) * radius * side,
+          y: point.y + sin(angle) * radius * side
+        )
+        if step == 0 && side > 0 { path.move(to: edge) } else { path.addLine(to: edge) }
+      }
+    }
+    path.closeSubpath()
+    return path
   }
 
   private func dragonPoint(center: CGPoint, unit: CGFloat, fraction: Double) -> CGPoint {
@@ -569,33 +599,44 @@ struct SolarFireDragonFormation: View {
   }
 
   private func dragonManePath(center: CGPoint, scale: CGFloat, angle: Double) -> Path {
-    let flutter = CGFloat(sin(time * 2.35)) * 0.08
-    let points = [
-      CGPoint(x: -0.58, y: 0.3), CGPoint(x: -0.7, y: 0.02),
-      CGPoint(x: -1.02 - flutter, y: -0.16), CGPoint(x: -0.72, y: -0.34),
-      CGPoint(x: -0.92 + flutter, y: -0.68), CGPoint(x: -0.48, y: -0.58),
-      CGPoint(x: -0.26, y: -0.32), CGPoint(x: 0.08, y: 0.08),
-    ].map { transform(point: $0, center: center, scale: scale, angle: angle) }
-
     return Path { path in
-      guard let first = points.first else { return }
-      path.move(to: first)
-      for point in points.dropFirst() { path.addLine(to: point) }
-      path.closeSubpath()
+      func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+        transform(point: CGPoint(x: x, y: y), center: center, scale: scale, angle: angle)
+      }
+      for strand in 0..<9 {
+        let t = CGFloat(strand) / 8
+        let rootY = -0.22 + t * 0.64
+        let flutter = CGFloat(sin(time * 2.35 + Double(strand) * 0.71)) * 0.055
+        let tipX = -0.82 - CGFloat(strand % 3) * 0.1
+        let tipY = rootY - 0.28 + flutter
+        path.move(to: point(-0.25, rootY))
+        path.addCurve(
+          to: point(tipX, tipY),
+          control1: point(-0.58, rootY - 0.18),
+          control2: point(tipX + 0.12, tipY + 0.13)
+        )
+        path.addCurve(
+          to: point(-0.31, rootY + 0.1),
+          control1: point(tipX + 0.1, tipY + 0.28),
+          control2: point(-0.58, rootY + 0.12)
+        )
+        path.closeSubpath()
+      }
     }
   }
 
   private func dragonScalePath(center: CGPoint, scale: CGFloat, angle: Double) -> Path {
     let points = [
-      CGPoint(x: -0.72, y: 0),
-      CGPoint(x: 0, y: -0.58),
-      CGPoint(x: 0.72, y: 0),
-      CGPoint(x: 0, y: 0.58),
+      CGPoint(x: -0.8, y: 0),
+      CGPoint(x: -0.2, y: -0.7),
+      CGPoint(x: 0.85, y: 0),
+      CGPoint(x: -0.2, y: 0.7),
     ].map { transform(point: $0, center: center, scale: scale, angle: angle) }
 
     return Path { path in
       path.move(to: points[0])
-      for point in points.dropFirst() { path.addLine(to: point) }
+      path.addQuadCurve(to: points[2], control: points[1])
+      path.addQuadCurve(to: points[0], control: points[3])
       path.closeSubpath()
     }
   }
@@ -616,25 +657,22 @@ struct SolarFireDragonFormation: View {
   }
 
   private func dragonHeadPath(center: CGPoint, scale: CGFloat, angle: Double) -> Path {
-    let points = [
-      CGPoint(x: -0.62, y: 0.18),
-      CGPoint(x: -0.28, y: -0.15),
-      CGPoint(x: 0.18, y: -0.18),
-      CGPoint(x: 0.5, y: -0.04),
-      CGPoint(x: 0.72, y: 0.06),
-      CGPoint(x: 0.5, y: 0.18),
-      CGPoint(x: 0.7, y: 0.4),
-      CGPoint(x: 0.24, y: 0.31),
-      CGPoint(x: 0.02, y: 0.58),
-      CGPoint(x: -0.22, y: 0.27),
-    ].map { transform(point: $0, center: center, scale: scale, angle: angle) }
-
     return Path { path in
-      guard let first = points.first else { return }
-      path.move(to: first)
-      for point in points.dropFirst() {
-        path.addLine(to: point)
+      func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+        transform(point: CGPoint(x: x, y: y), center: center, scale: scale, angle: angle)
       }
+      path.move(to: point(-0.58, 0.18))
+      path.addCurve(
+        to: point(-0.12, -0.22), control1: point(-0.6, -0.06), control2: point(-0.35, -0.29))
+      path.addQuadCurve(to: point(0.23, -0.15), control: point(0.15, -0.28))
+      path.addQuadCurve(to: point(0.43, -0.04), control: point(0.28, -0.02))
+      path.addCurve(
+        to: point(0.74, 0.06), control1: point(0.58, -0.12), control2: point(0.77, -0.08))
+      path.addQuadCurve(to: point(0.62, 0.19), control: point(0.79, 0.17))
+      path.addLine(to: point(0.26, 0.18))
+      path.addQuadCurve(to: point(0.08, 0.43), control: point(0.34, 0.41))
+      path.addCurve(
+        to: point(-0.58, 0.18), control1: point(-0.13, 0.5), control2: point(-0.43, 0.35))
       path.closeSubpath()
     }
   }

@@ -1,4 +1,15 @@
+import AppKit
 import SwiftUI
+
+@MainActor
+private enum WoodMaterialAsset {
+  static let image: NSImage = {
+    guard let url = Bundle.module.url(forResource: "WoodSurface", withExtension: "png"),
+      let image = NSImage(contentsOf: url)
+    else { return NSImage() }
+    return image
+  }()
+}
 
 struct WoodenDoorArtwork: View {
   let knockCount: Int
@@ -24,17 +35,19 @@ struct WoodenDoorArtwork: View {
 
         plankDepth(size: size)
 
-        woodKnots(size: size)
+        woodMaterial(size: size, alignment: .center)
+          .opacity(0.6)
 
         agedWoodWear(size: size)
+
+        woodGrain(size: size)
+          .opacity(0.4)
 
         ForEach(0..<2, id: \.self) { column in
           ForEach(0..<2, id: \.self) { row in
             carvedPanel(column: column, row: row, size: size)
           }
         }
-
-        woodGrain(size: size)
 
         materialLighting(size: size)
 
@@ -91,6 +104,16 @@ struct WoodenDoorArtwork: View {
     }
   }
 
+  private func woodMaterial(size: CGSize, alignment: Alignment) -> some View {
+    Image(nsImage: WoodMaterialAsset.image)
+      .resizable()
+      .scaledToFill()
+      .frame(width: size.width, height: size.height, alignment: alignment)
+      .clipped()
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
+  }
+
   private func plankDepth(size: CGSize) -> some View {
     HStack(spacing: 0) {
       ForEach(0..<8, id: \.self) { index in
@@ -127,23 +150,32 @@ struct WoodenDoorArtwork: View {
     .allowsHitTesting(false)
   }
 
-  private func woodGrain(size: CGSize) -> some View {
+  private func woodGrain(size: CGSize, plankCount: Int = 8, seedOffset: Int = 0) -> some View {
     Canvas { context, _ in
-      let plankWidth = size.width / 8
-      for plank in 0..<8 {
-        for fiber in 0..<14 {
-          let seed = Double(plank * 31 + fiber + 7)
+      let plankWidth = size.width / CGFloat(plankCount)
+      for plank in 0..<plankCount {
+        let knotSeed = Double(plank + seedOffset + 71)
+        let knotX = plankWidth * (CGFloat(plank) + 0.3 + woodHash(knotSeed) * 0.4)
+        let knotY = size.height * (0.23 + woodHash(knotSeed * 3.7) * 0.54)
+        let knotWidth = min(plankWidth * 0.07, 13)
+        for fiber in 0..<64 {
+          let seed = Double(plank * 83 + fiber + seedOffset + 7)
           let baseX =
             CGFloat(plank) * plankWidth
-            + plankWidth * (0.08 + woodHash(seed * 2.37) * 0.84)
-          let amplitude = plankWidth * (0.012 + woodHash(seed * 5.1) * 0.045)
+            + plankWidth * (CGFloat(fiber) + woodHash(seed * 2.37)) / 64
+          let amplitude = min(plankWidth * 0.015, 3) * (0.3 + woodHash(seed * 5.1))
           var grain = Path()
-          for step in 0...30 {
-            let progress = CGFloat(step) / 30
+          for step in 0...96 {
+            let progress = CGFloat(step) / 96
             let phase = Double(progress) * (5.5 + woodHash(seed * 3.7) * 6.2) + seed
+            let distanceX = (baseX - knotX) / max(knotWidth * 3, 1)
+            let distanceY = (progress * size.height - knotY) / max(knotWidth * 7, 1)
+            let deflection =
+              exp(-distanceX * distanceX - distanceY * distanceY)
+              * knotWidth * (baseX < knotX ? -1 : 1)
             let x =
               baseX + CGFloat(sin(phase)) * amplitude
-              + CGFloat(sin(phase * 0.37)) * amplitude * 0.58
+              + CGFloat(sin(phase * 0.37)) * amplitude * 0.58 + deflection
             let point = CGPoint(x: x, y: progress * size.height)
             if step == 0 { grain.move(to: point) } else { grain.addLine(to: point) }
           }
@@ -151,18 +183,31 @@ struct WoodenDoorArtwork: View {
             grain,
             with: .color(
               fiber.isMultiple(of: 5)
-                ? Color.black.opacity(0.27)
-                : Color(red: 0.72, green: 0.43, blue: 0.19).opacity(0.14)
+                ? Color.black.opacity(0.24)
+                : Color(red: 0.72, green: 0.43, blue: 0.19).opacity(
+                  0.08 + Double(woodHash(seed)) * 0.12)
             ),
             style: StrokeStyle(
-              lineWidth: fiber.isMultiple(of: 7) ? 1.2 : 0.58,
+              lineWidth: fiber.isMultiple(of: 7) ? 0.85 : 0.35,
               lineCap: .round
             )
           )
         }
+        let knot = CGRect(
+          x: knotX - knotWidth * 0.3, y: knotY - knotWidth * 1.8,
+          width: knotWidth * 0.6, height: knotWidth * 3.6
+        )
+        context.fill(
+          Path(ellipseIn: knot),
+          with: .linearGradient(
+            Gradient(colors: [.clear, edgeWood.opacity(0.65), .clear]),
+            startPoint: CGPoint(x: knot.midX, y: knot.minY),
+            endPoint: CGPoint(x: knot.midX, y: knot.maxY)
+          )
+        )
       }
 
-      for index in 0..<150 {
+      for index in 0..<400 {
         let seed = Double(index + 401)
         let x = size.width * woodHash(seed * 1.73)
         let y = size.height * woodHash(seed * 4.19)
@@ -175,55 +220,6 @@ struct WoodenDoorArtwork: View {
           with: .color(Color.black.opacity(0.15 + Double(index % 3) * 0.03)),
           style: StrokeStyle(lineWidth: 0.45, lineCap: .round)
         )
-      }
-    }
-    .allowsHitTesting(false)
-  }
-
-  private func woodKnots(size: CGSize) -> some View {
-    Canvas { context, _ in
-      let positions: [(CGPoint, CGFloat)] = [
-        (CGPoint(x: size.width * 0.18, y: size.height * 0.16), 0.82),
-        (CGPoint(x: size.width * 0.81, y: size.height * 0.38), 1.05),
-        (CGPoint(x: size.width * 0.29, y: size.height * 0.78), 0.9),
-        (CGPoint(x: size.width * 0.69, y: size.height * 0.88), 1.12),
-      ]
-
-      for (index, item) in positions.enumerated() {
-        let (position, scale) = item
-        let coreWidth = CGFloat(13 + index * 2) * scale
-        context.fill(
-          Path(
-            ellipseIn: CGRect(
-              x: position.x - coreWidth * 0.5,
-              y: position.y - coreWidth * 0.16,
-              width: coreWidth,
-              height: coreWidth * 0.32
-            )
-          ),
-          with: .radialGradient(
-            Gradient(colors: [Color.black.opacity(0.72), warmWood.opacity(0.44)]),
-            center: CGPoint(x: position.x - coreWidth * 0.14, y: position.y),
-            startRadius: 0,
-            endRadius: coreWidth * 0.58
-          )
-        )
-
-        for ring in 0..<6 {
-          let width = CGFloat(22 + ring * 14 + index * 2) * scale
-          let height = width * (0.28 + CGFloat(index % 2) * 0.05)
-          let rect = CGRect(
-            x: position.x - width / 2,
-            y: position.y - height / 2,
-            width: width,
-            height: height
-          )
-          context.stroke(
-            Path(ellipseIn: rect),
-            with: .color(Color.black.opacity(0.2 - Double(ring) * 0.023)),
-            lineWidth: ring == 0 ? 1.6 : 0.65
-          )
-        }
       }
     }
     .allowsHitTesting(false)
@@ -380,19 +376,41 @@ struct WoodenDoorArtwork: View {
     let x = CGFloat(column) * halfWidth + halfWidth / 2
     let panelHeight = size.height * (row == 0 ? 0.29 : 0.37)
     let y = size.height * (row == 0 ? 0.25 : 0.68)
+    let panelSize = CGSize(width: max(1, halfWidth - 52), height: panelHeight)
 
     return RoundedRectangle(cornerRadius: 4)
       .fill(
         LinearGradient(
           colors: [
-            Color.black.opacity(0.14),
-            warmWood.opacity(0.035),
-            Color.black.opacity(0.2),
+            Color(red: 0.19, green: 0.085, blue: 0.032),
+            Color(red: 0.34, green: 0.17, blue: 0.072),
+            Color(red: 0.23, green: 0.105, blue: 0.038),
           ],
           startPoint: .topLeading,
           endPoint: .bottomTrailing
         )
       )
+      .overlay {
+        woodMaterial(size: panelSize, alignment: row == 0 ? .top : .bottom)
+          .scaleEffect(x: column == 0 ? 1 : -1, y: 1)
+          .opacity(0.78)
+          .clipShape(RoundedRectangle(cornerRadius: 4))
+      }
+      .overlay {
+        woodGrain(size: panelSize, plankCount: 1, seedOffset: column * 139 + row * 57)
+          .opacity(0.3)
+          .clipShape(RoundedRectangle(cornerRadius: 4))
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: 3)
+          .strokeBorder(
+            LinearGradient(
+              colors: [edgeWood.opacity(0.95), darkWood, brass.opacity(0.18)],
+              startPoint: .topLeading, endPoint: .bottomTrailing
+            ),
+            lineWidth: 9
+          )
+      }
       .overlay {
         RoundedRectangle(cornerRadius: 4)
           .stroke(
@@ -407,13 +425,13 @@ struct WoodenDoorArtwork: View {
             ),
             lineWidth: 1.2
           )
-          .padding(6)
+          .padding(10)
       }
       .overlay {
         RoundedRectangle(cornerRadius: 2)
           .stroke(Color.black.opacity(0.68), lineWidth: 4)
       }
-      .frame(width: halfWidth - 52, height: panelHeight)
+      .frame(width: panelSize.width, height: panelHeight)
       .position(x: x, y: y)
   }
 

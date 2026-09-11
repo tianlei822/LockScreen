@@ -5,7 +5,7 @@ import SwiftUI
 private enum InkLandscapeAsset {
   static let image: NSImage = {
     guard
-      let url = Bundle.module.url(forResource: "InkLandscapeRefined", withExtension: "png"),
+      let url = Bundle.module.url(forResource: "InkLandscapeFoliage", withExtension: "png"),
       let image = NSImage(contentsOf: url)
     else {
       return NSImage()

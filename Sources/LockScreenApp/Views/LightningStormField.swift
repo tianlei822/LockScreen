@@ -545,6 +545,7 @@ struct LightningStormField: View {
         )
       }
       branches.append(lightningStroke(connecting: branchPoints, endScale: 0.16))
+      branches.append(lightningFork(from: branchPoints, direction: side))
     }
 
     return LightningGeometry(trunk: trunk, branches: branches)
@@ -624,15 +625,57 @@ struct LightningStormField: View {
           ))
       }
       branches.append(lightningStroke(connecting: branchPoints, endScale: 0.2))
+      if !isDistant {
+        branches.append(lightningFork(from: branchPoints, direction: -direction))
+      }
     }
 
     return LightningGeometry(trunk: trunk, branches: branches)
   }
 
+  private func lightningFork(from points: [CGPoint], direction: CGFloat) -> LightningStroke {
+    let origin = points[points.count / 2]
+    let end = points[points.count - 1]
+    let reach = hypot(end.x - origin.x, end.y - origin.y) * 0.65
+    let forkPoints = (0...5).map { index in
+      let progress = CGFloat(index) / 5
+      return CGPoint(
+        x: origin.x + direction * reach * progress
+          + sin(progress * 19) * reach * 0.09,
+        y: origin.y + reach * progress * 0.6
+      )
+    }
+    let fork = lightningStroke(connecting: forkPoints, endScale: 0.05)
+    return LightningStroke(
+      path: fork.path,
+      segments: fork.segments.map {
+        LightningSegment(path: $0.path, widthScale: $0.widthScale * 0.42)
+      }
+    )
+  }
+
   private func lightningStroke(
-    connecting points: [CGPoint],
+    connecting controlPoints: [CGPoint],
     endScale: CGFloat
   ) -> LightningStroke {
+    // Small-scale leaders follow the same seeded trunk throughout a flash.
+    var points: [CGPoint] = []
+    for (start, end) in zip(controlPoints, controlPoints.dropFirst()) {
+      let dx = end.x - start.x
+      let dy = end.y - start.y
+      let distance = max(1, hypot(dx, dy))
+      for step in 0..<4 {
+        let fraction = CGFloat(step) / 4
+        let phase = start.x * 0.73 + start.y * 0.37 + CGFloat(step) * 8.31
+        let offset = sin(phase) * min(3.5, distance * 0.075) * sin(fraction * .pi)
+        points.append(
+          CGPoint(
+            x: start.x + dx * fraction - dy / distance * offset,
+            y: start.y + dy * fraction + dx / distance * offset
+          ))
+      }
+    }
+    if let last = controlPoints.last { points.append(last) }
     var path = Path()
     guard let first = points.first else {
       return LightningStroke(path: path, segments: [])
@@ -669,7 +712,7 @@ struct LightningStormField: View {
     isDistant: Bool
   ) {
     var aura = context
-    aura.addFilter(.blur(radius: isDistant ? 9 : 14 + energy * 8))
+    aura.addFilter(.blur(radius: isDistant ? 6 : 9 + energy * 5))
     aura.stroke(
       geometry.trunk.path,
       with: .color(style.primary.opacity(intensity * (isDistant ? 0.42 : 0.78))),
@@ -704,11 +747,11 @@ struct LightningStormField: View {
 
     for branch in geometry.branches {
       var branchGlow = context
-      branchGlow.addFilter(.blur(radius: isDistant ? 4 : 7))
+      branchGlow.addFilter(.blur(radius: isDistant ? 3 : 4))
       branchGlow.stroke(
         branch.path,
-        with: .color(style.secondary.opacity(intensity * 0.58)),
-        style: StrokeStyle(lineWidth: isDistant ? 2.8 : 6 + energy * 4, lineCap: .round)
+        with: .color(style.secondary.opacity(intensity * 0.28)),
+        style: StrokeStyle(lineWidth: isDistant ? 1.8 : 3 + energy * 2, lineCap: .round)
       )
 
       let branchBaseWidth = isDistant ? 0.62 : 1.2 + energy * 1.15

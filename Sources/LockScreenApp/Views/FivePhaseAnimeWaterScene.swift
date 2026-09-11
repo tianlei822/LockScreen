@@ -69,27 +69,47 @@ extension ElementalAnimeScene {
       )
     }
 
-    for index in 0..<110 {
+    for index in 0..<170 {
       let seed = Double(index + 1)
       let xHash = abs(sin(seed * 17.731) * 4_375.3).truncatingRemainder(dividingBy: 1)
+      let depth = abs(sin(seed * 3.17))
+      let landingY = size.height * (0.57 + depth * 0.42)
+      let speed = 180 + depth * 230
+      let fallDuration = Double(landingY + 30) / speed
+      let cycle = fallDuration + 0.65
+      let age = (time + seed * 0.719).truncatingRemainder(dividingBy: cycle)
       let x = size.width * CGFloat(xHash)
-      let speed = 230 + seed.truncatingRemainder(dividingBy: 7) * 31
-      let travel = (time * speed + seed * 43).truncatingRemainder(
-        dividingBy: Double(size.height * 1.18))
-      let y = -size.height * 0.12 + CGFloat(travel)
-      let length = CGFloat(11 + seed.truncatingRemainder(dividingBy: 8) * 4.2)
-      let slant = length * 0.19
+      let length = CGFloat(4 + depth * 13)
+      let slant = length * 0.16
+      if age >= fallDuration {
+        let rippleAge = (age - fallDuration) / 0.65
+        let radius = CGFloat(2 + rippleAge * (7 + depth * 10))
+        let rippleRect = CGRect(
+          x: x - radius, y: landingY - radius * 0.22,
+          width: radius * 2, height: radius * 0.44
+        )
+        context.stroke(
+          Path(ellipseIn: rippleRect),
+          with: .color(Color.white.opacity((1 - rippleAge) * (0.08 + depth * 0.15) * power)),
+          lineWidth: 0.35 + depth * 0.3
+        )
+        continue
+      }
+      let y = -30 + CGFloat(age * speed)
+      let drift = (landingY - y) * 0.16
       var rain = Path()
-      rain.move(to: CGPoint(x: x, y: y))
-      rain.addLine(to: CGPoint(x: x - slant, y: y + length))
+      let tip = CGPoint(x: x + drift, y: y)
+      let tail = CGPoint(x: tip.x + slant, y: y - length)
+      rain.move(to: tail)
+      rain.addLine(to: tip)
 
-      if index.isMultiple(of: 9) {
+      if index.isMultiple(of: 23) {
         var rainGlow = context
-        rainGlow.addFilter(.blur(radius: 3))
+        rainGlow.addFilter(.blur(radius: 1.2))
         rainGlow.stroke(
           rain,
-          with: .color(element.color.opacity(0.2 * power)),
-          style: StrokeStyle(lineWidth: 3.2, lineCap: .round)
+          with: .color(element.color.opacity(0.08 * power)),
+          style: StrokeStyle(lineWidth: 1.6, lineCap: .round)
         )
       }
       context.stroke(
@@ -97,14 +117,14 @@ extension ElementalAnimeScene {
         with: .linearGradient(
           Gradient(colors: [
             Color.white.opacity(0),
-            Color.white.opacity((0.24 + Double(index % 5) * 0.08) * power),
-            element.color.opacity(0.12 * power),
+            Color.white.opacity((0.1 + depth * 0.24) * power),
+            Color.white.opacity((0.16 + depth * 0.32) * power),
           ]),
-          startPoint: CGPoint(x: x, y: y),
-          endPoint: CGPoint(x: x - slant, y: y + length)
+          startPoint: tail,
+          endPoint: tip
         ),
         style: StrokeStyle(
-          lineWidth: index.isMultiple(of: 7) ? 1.25 : 0.62,
+          lineWidth: 0.25 + depth * 0.5,
           lineCap: .round
         )
       )

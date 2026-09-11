@@ -109,6 +109,44 @@ private struct DoorRingButton: View {
               lineWidth: 11
             )
             .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1).padding(4))
+            .overlay {
+              Circle()
+                .stroke(
+                  LinearGradient(
+                    colors: [
+                      Color(red: 1, green: 0.88, blue: 0.6).opacity(0.7), .black.opacity(0.7),
+                    ],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                  ), lineWidth: 0.8
+                )
+                .padding(-4.7)
+            }
+            .overlay {
+              Canvas { context, size in
+                let center = CGPoint(x: size.width / 2, y: size.height / 2)
+                for index in 0..<120 {
+                  let seed = Double(index + (side == .left ? 19 : 83))
+                  let angle = seed * 2.39996
+                  let radius = size.width / 2 - 4 + CGFloat(abs(sin(seed * 7.31))) * 8
+                  let point = CGPoint(
+                    x: center.x + cos(angle) * radius,
+                    y: center.y + sin(angle) * radius
+                  )
+                  let diameter = CGFloat(0.35 + abs(sin(seed * 3.17)) * 0.8)
+                  context.fill(
+                    Path(
+                      ellipseIn: CGRect(x: point.x, y: point.y, width: diameter, height: diameter)),
+                    with: .color(
+                      index.isMultiple(of: 4)
+                        ? Color(red: 0.13, green: 0.19, blue: 0.11).opacity(0.42)
+                        : Color.black.opacity(0.23)
+                    )
+                  )
+                }
+              }
+              .mask(Circle().stroke(lineWidth: 10))
+              .allowsHitTesting(false)
+            }
             .frame(width: 92, height: 92)
         }
         .frame(width: 92, height: 108, alignment: .top)
