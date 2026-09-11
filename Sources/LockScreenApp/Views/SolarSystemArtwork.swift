@@ -281,6 +281,13 @@ private struct SolarGranulationCanvas: View {
       let radius = min(size.width, size.height) * 0.5
       let center = CGPoint(x: size.width * 0.5, y: size.height * 0.5)
 
+      if let image = SolarPlanetTextureRenderer.image(
+        name: "Sun", spin: time * 0.045, light: SIMD3(0, 0, 1)
+      ) {
+        context.draw(Image(decorative: image, scale: 1), in: CGRect(origin: .zero, size: size))
+        return
+      }
+
       for index in 0..<58 {
         let seed = Double(index + 1)
         let angle = detailHash(seed * 4.13) * 2 * Double.pi + time * 0.018

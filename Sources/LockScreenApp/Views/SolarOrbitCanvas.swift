@@ -407,7 +407,7 @@ struct SolarOrbitCanvas: View {
     .sorted { $0.point.y < $1.point.y }
 
     for (planet, point) in placements {
-      let radius = max(4, unit * planet.radius)
+      let radius = max(4, unit * planet.radius * 1.35)
       let planetRect = CGRect(
         x: point.x - radius,
         y: point.y - radius,
@@ -438,36 +438,31 @@ struct SolarOrbitCanvas: View {
 
       var surface = context
       surface.clip(to: Path(ellipseIn: planetRect))
-      drawSurfaceDetails(
-        context: &surface,
-        planet: planet,
-        rect: planetRect,
-        spin: time * planet.spinSpeed + planet.phase
+      let sunDistance = max(1, hypot(center.x - point.x, center.y - point.y))
+      let towardSun = CGPoint(
+        x: (center.x - point.x) / sunDistance, y: (center.y - point.y) / sunDistance
       )
-
-      context.fill(
-        Path(ellipseIn: planetRect),
-        with: .linearGradient(
-          Gradient(colors: [.white.opacity(0.22), .clear, .black.opacity(0.67)]),
-          startPoint: CGPoint(x: planetRect.minX, y: planetRect.minY),
-          endPoint: CGPoint(x: planetRect.maxX, y: planetRect.maxY)
+      let orbitAngle = time * planet.speed + planet.phase
+      if let image = SolarPlanetTextureRenderer.image(
+        name: planet.name,
+        spin: time * planet.spinSpeed * 0.18 + planet.phase,
+        light: SIMD3(Double(towardSun.x), Double(towardSun.y), -sin(orbitAngle) * 0.7)
+      ) {
+        surface.draw(Image(decorative: image, scale: 1), in: planetRect)
+      } else {
+        drawSurfaceDetails(
+          context: &surface, planet: planet, rect: planetRect,
+          spin: time * planet.spinSpeed + planet.phase
         )
-      )
+      }
       context.stroke(
         Path(ellipseIn: planetRect.insetBy(dx: 0.4, dy: 0.4)),
-        with: .color(Color.white.opacity(0.22)),
-        lineWidth: max(0.45, radius * 0.035)
-      )
-      context.fill(
-        Path(
-          ellipseIn: CGRect(
-            x: point.x - radius * 0.48,
-            y: point.y - radius * 0.5,
-            width: radius * 0.35,
-            height: radius * 0.2
-          )
+        with: .linearGradient(
+          Gradient(colors: [.white.opacity(0.18), .clear, .clear]),
+          startPoint: CGPoint(x: point.x + towardSun.x * radius, y: point.y + towardSun.y * radius),
+          endPoint: CGPoint(x: point.x - towardSun.x * radius, y: point.y - towardSun.y * radius)
         ),
-        with: .color(Color.white.opacity(0.18))
+        lineWidth: max(0.35, radius * 0.02)
       )
 
       drawRings(context: context, planet: planet, point: point, radius: radius, front: true)
@@ -497,16 +492,16 @@ struct SolarOrbitCanvas: View {
 
     let radius = rect.width * 0.5
     var halo = context
-    halo.addFilter(.blur(radius: max(1.5, radius * 0.42)))
+    halo.addFilter(.blur(radius: max(0.8, radius * 0.13)))
     halo.stroke(
       Path(ellipseIn: rect.insetBy(dx: -radius * 0.13, dy: -radius * 0.13)),
-      with: .color(atmosphere.opacity(0.48)),
-      lineWidth: max(1, radius * 0.18)
+      with: .color(atmosphere.opacity(0.22)),
+      lineWidth: max(0.6, radius * 0.07)
     )
     context.stroke(
       Path(ellipseIn: rect.insetBy(dx: -0.7, dy: -0.7)),
-      with: .color(atmosphere.opacity(0.52)),
-      lineWidth: max(0.55, radius * 0.055)
+      with: .color(atmosphere.opacity(0.28)),
+      lineWidth: max(0.4, radius * 0.025)
     )
   }
 
@@ -909,19 +904,21 @@ struct SolarOrbitCanvas: View {
   ) {
     guard let ring = planet.ring else { return }
 
-    let layerCount = ring == .saturn ? 4 : 2
+    let layerCount = ring == .saturn ? 48 : 7
     let rotation = ring == .saturn ? -0.25 : 1.12
     let baseOpacity = ring == .saturn ? 0.66 : 0.28
     for index in 0..<layerCount {
       let fraction = CGFloat(index) / CGFloat(max(1, layerCount - 1))
-      let horizontalRadius = radius * (1.42 + fraction * (ring == .saturn ? 0.72 : 0.48))
-      let verticalRadius = radius * (0.34 + fraction * 0.12)
+      // Leave a dark division between Saturn's dense inner and outer ring bands.
+      if ring == .saturn && fraction > 0.59 && fraction < 0.66 { continue }
+      let horizontalRadius = radius * (1.24 + fraction * (ring == .saturn ? 1.02 : 0.66))
+      let verticalRadius = horizontalRadius * 0.27
       let path = ellipseArcPath(
         center: point,
         horizontalRadius: horizontalRadius,
         verticalRadius: verticalRadius,
         rotation: rotation,
-        startAngle: front ? 0 : 0,
+        startAngle: front ? 0 : .pi,
         endAngle: front ? .pi : 2 * .pi
       )
       let color =
@@ -930,8 +927,13 @@ struct SolarOrbitCanvas: View {
         : Color(red: 0.62, green: 0.91, blue: 0.94)
       context.stroke(
         path,
-        with: .color(color.opacity(baseOpacity - Double(fraction) * 0.08)),
-        lineWidth: max(0.45, radius * (ring == .saturn ? 0.075 : 0.045))
+        with: .color(
+          color.opacity(
+            (baseOpacity - Double(fraction) * 0.08)
+              * (fraction < 0.2 ? 0.38 : 0.7 + 0.3 * abs(sin(Double(index) * 2.17)))
+          )
+        ),
+        lineWidth: max(0.22, radius * (ring == .saturn ? 0.02 : 0.012))
       )
     }
   }
@@ -982,11 +984,15 @@ struct SolarOrbitCanvas: View {
         width: moonRadius * 2,
         height: moonRadius * 2
       )
+      let sunDistance = max(1, hypot(center.x - moon.x, center.y - moon.y))
       context.fill(
         Path(ellipseIn: moonRect),
         with: .radialGradient(
           Gradient(colors: [satellite.highlight, satellite.color, satellite.shadow]),
-          center: CGPoint(x: moon.x - moonRadius * 0.34, y: moon.y - moonRadius * 0.34),
+          center: CGPoint(
+            x: moon.x + (center.x - moon.x) / sunDistance * moonRadius * 0.34,
+            y: moon.y + (center.y - moon.y) / sunDistance * moonRadius * 0.34
+          ),
           startRadius: 0,
           endRadius: moonRadius * 1.5
         )

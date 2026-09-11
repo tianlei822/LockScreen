@@ -106,6 +106,13 @@ TCC 权限连续性。可通过 `APPLE_SIGNING_IDENTITY` 指定其他证书；�
 
 ## Verification / 验证
 
+Solar surface maps are by Solar System Scope / INOVE under CC BY 4.0. See
+[asset attribution](Sources/LockScreenApp/Resources/PlanetTextures/ATTRIBUTION.txt)
+for sources and runtime adaptations. Orbits and sizes remain artistic, not to scale.
+
+太阳与行星表面贴图来自 Solar System Scope / INOVE，采用 CC BY 4.0 许可；
+来源及运行时处理详见上述署名文件。轨道与尺寸仍采用艺术比例。
+
 ```sh
 swift format lint --recursive Sources Tests
 sh Scripts/check-status-item-appearance.sh
