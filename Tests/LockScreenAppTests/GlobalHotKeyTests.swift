@@ -5,6 +5,59 @@ import XCTest
 
 final class GlobalHotKeyTests: XCTestCase {
   @MainActor
+  func testRepeatedRegistrationDoesNotLeakTheHotKey() {
+    let hotKey = GlobalHotKey(keyCode: UInt32(kVK_F15)) {}
+    let replacement = GlobalHotKey(keyCode: UInt32(kVK_F15)) {}
+    defer {
+      hotKey.unregister()
+      replacement.unregister()
+    }
+    XCTAssertTrue(hotKey.register())
+    XCTAssertTrue(hotKey.register())
+    hotKey.unregister()
+    XCTAssertTrue(replacement.register())
+  }
+
+  @MainActor
+  func testRegistrationRecoversAfterConflictIsReleased() async throws {
+    let owner = GlobalHotKey(keyCode: UInt32(kVK_F15)) {}
+    let waiting = GlobalHotKey(keyCode: UInt32(kVK_F15)) {}
+    XCTAssertTrue(owner.register())
+    defer {
+      owner.unregister()
+      waiting.unregister()
+    }
+    XCTAssertFalse(waiting.register())
+    waiting.retryRegistration(initialDelay: .milliseconds(10))
+    try await Task.sleep(for: .milliseconds(30))
+    XCTAssertFalse(waiting.isRegistered)
+
+    owner.unregister()
+    for _ in 0..<100 where !waiting.isRegistered {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    XCTAssertTrue(waiting.isRegistered)
+  }
+
+  @MainActor
+  func testUnregisterCancelsPendingRecovery() async throws {
+    let owner = GlobalHotKey(keyCode: UInt32(kVK_F15)) {}
+    let waiting = GlobalHotKey(keyCode: UInt32(kVK_F15)) {}
+    XCTAssertTrue(owner.register())
+    defer {
+      owner.unregister()
+      waiting.unregister()
+    }
+    XCTAssertFalse(waiting.register())
+    waiting.retryRegistration(initialDelay: .milliseconds(10))
+    waiting.unregister()
+    owner.unregister()
+    try await Task.sleep(for: .milliseconds(50))
+    XCTAssertFalse(waiting.isRegistered)
+    XCTAssertTrue(owner.register())
+  }
+
+  @MainActor
   func testRegisteredHotKeyDispatchesItsAction() async throws {
     let actionInvoked = expectation(description: "Global hot key action invoked")
     let hotKey = GlobalHotKey(

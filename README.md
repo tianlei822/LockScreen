@@ -75,6 +75,15 @@ Threshold 仅驻留状态栏的后台进程会注册所选快捷键。可在状�
 接收进程保持运行并在退出后自动重启；主窗口和 Dock 图标都不需要打开。Carbon 只注册这一组
 按键，因此 Threshold 不会申请“辅助功能”或“输入监控”权限。
 
+If registration fails at startup or after session recovery, Threshold retries with delays of
+2, 4, 8, 16, then 30 seconds until it succeeds. Selecting the current shortcut again in the
+status menu explicitly renews its registration without restarting the app. A conflicting
+replacement leaves the previous choice intact. Diagnostic messages in Console under
+`com.tianlei.threshold` distinguish registration, hot-key receipt, and ritual presentation.
+启动或会话恢复时注册失败，会按 2、4、8、16、30 秒的间隔退避重试，之后每 30 秒重试直到成功。
+在状态栏菜单中再次选择当前快捷键，会主动重新注册，无需重启应用；切换到冲突快捷键时保留原选择。
+“控制台”中 `com.tianlei.threshold` 的日志分别记录注册、按键接收和窗口展示，便于定位间歇性失效。
+
 Local builds default to the login-keychain identity `Jarvis Codex Local Development` (SHA-1
 `B4035AE98DA51B2F173CF52BAACC758E5B35DF63`), matching the Jarvis packaging setup on this Mac.
 The build stops if that identity is unavailable and never falls back to ad-hoc signing, whose

@@ -18,6 +18,7 @@ final class GlobalHotKey {
 
   private var hotKeyRef: EventHotKeyRef?
   private var handlerRef: EventHandlerRef?
+  private var recoveryTask: Task<Void, Never>?
 
   init(
     keyCode: UInt32 = UInt32(kVK_ANSI_L), modifiers: UInt32 = UInt32(cmdKey),
@@ -32,8 +33,32 @@ final class GlobalHotKey {
     self.init(keyCode: preset.keyCode, modifiers: preset.modifiers, action: action)
   }
 
+  var isRegistered: Bool { hotKeyRef != nil }
+
+  /// Retry only a known failure. Healthy registrations are never periodically torn down.
+  func retryRegistration(initialDelay: Duration = .seconds(2)) {
+    guard !isRegistered, recoveryTask == nil else { return }
+    recoveryTask = Task { @MainActor [weak self] in
+      var delay = initialDelay
+      while !Task.isCancelled {
+        do {
+          try await Task.sleep(for: delay)
+        } catch {
+          return
+        }
+        guard !Task.isCancelled, let self else { return }
+        if self.register() {
+          self.recoveryTask = nil
+          return
+        }
+        delay = min(delay * 2, .seconds(30))
+      }
+    }
+  }
+
   @discardableResult
   func register() -> Bool {
+    guard !isRegistered else { return true }
     var eventType = EventTypeSpec(
       eventClass: OSType(kEventClassKeyboard),
       eventKind: UInt32(kEventHotKeyPressed)
@@ -46,6 +71,7 @@ final class GlobalHotKey {
         guard let userData else { return OSStatus(eventNotHandledErr) }
         let hotKey = Unmanaged<GlobalHotKey>.fromOpaque(userData).takeUnretainedValue()
         Task { @MainActor in
+          GlobalHotKey.logger.notice("Received the global hot key")
           hotKey.action()
         }
         return noErr
@@ -82,11 +108,15 @@ final class GlobalHotKey {
       }
       return false
     }
-    Self.logger.info("Registered the global hot key")
+    Self.logger.notice(
+      "Registered global hot key (key: \(self.keyCode), modifiers: \(self.modifiers))"
+    )
     return true
   }
 
   func unregister() {
+    recoveryTask?.cancel()
+    recoveryTask = nil
     if let hotKeyRef {
       UnregisterEventHotKey(hotKeyRef)
       self.hotKeyRef = nil

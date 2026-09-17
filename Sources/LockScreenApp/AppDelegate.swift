@@ -1,7 +1,12 @@
 import AppKit
+import OSLog
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+  private static let logger = Logger(
+    subsystem: ProductMetadata.bundleIdentifier, category: "Presentation"
+  )
+
   static let hotKeyRecoveryNotifications: [NSNotification.Name] = [
     NSWorkspace.sessionDidBecomeActiveNotification,
     NSWorkspace.didWakeNotification,
@@ -117,15 +122,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
   /// The configured shortcut (or the status menu): show the ritual and take over the screen.
   func presentRitual() {
-    guard let window = WindowPresentation.mainRitualWindow() else { return }
+    guard let window = WindowPresentation.mainRitualWindow() else {
+      Self.logger.error("Cannot present ritual: no ritual window")
+      return
+    }
     guard
       !Self.shouldIgnorePresentationRequest(
         appIsHidden: NSApp.isHidden,
         windowIsVisible: window.occlusionState.contains(.visible),
         windowIsImmersive: WindowPresentation.isImmersive(window)
       )
-    else { return }
+    else {
+      Self.logger.notice("Presentation skipped: ritual is already visible and immersive")
+      return
+    }
 
+    Self.logger.notice("Presenting ritual")
     NSApp.unhide(nil)
     WindowPresentation.enterImmersive(window)
   }
@@ -184,14 +196,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
   @discardableResult
   private func registerGlobalHotKey(_ preset: GlobalHotKeyPreset) -> Bool {
-    if preset == selectedHotKey, hotKey != nil {
-      return true
+    if preset == selectedHotKey, let hotKey {
+      // Selecting the current menu item is an explicit repair request, even
+      // when Carbon still holds a reference to the previous registration.
+      let registered = hotKey.reregister()
+      if !registered { hotKey.retryRegistration() }
+      return registered
     }
 
     let candidate = GlobalHotKey(preset: preset) { [weak self] in
       self?.presentRitual()
     }
     guard candidate.register() else {
+      // Keep retrying the saved startup choice, but never replace a working
+      // shortcut with a conflicting menu selection.
+      if hotKey == nil {
+        hotKey = candidate
+        candidate.retryRegistration()
+      }
       FileHandle.standardError.write(
         Data(
           "\(ProductMetadata.displayName): could not register \(preset.title) (already taken?)\n"
@@ -209,12 +231,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
   }
 
   private func recoverGlobalHotKeyRegistration() {
-    if let hotKey, hotKey.reregister() {
+    guard let hotKey else {
+      _ = registerGlobalHotKey(selectedHotKey)
       return
     }
-
-    hotKey = nil
-    _ = registerGlobalHotKey(selectedHotKey)
+    if !hotKey.reregister() {
+      hotKey.retryRegistration()
+    }
   }
 
 }
